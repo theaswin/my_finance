@@ -13,6 +13,9 @@
     <!-- Lucide Icons CDN -->
     <script src="https://unpkg.com/lucide@latest"></script>
     
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    
     <!-- Custom Style Sheet -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
@@ -77,7 +80,7 @@
         <!-- Categories & Investments Grid -->
         <main class="finance-grid">
             {% for finance in finances %}
-                <div class="finance-card glass-card">
+                <div class="finance-card glass-card clickable" onclick="redirectToHistory({{ finance.id }})">
                     <!-- Card Header -->
                     <div class="card-header">
                         <div class="category-meta">
@@ -94,13 +97,13 @@
                             </div>
                         </div>
                         <div class="card-actions">
-                            <button class="btn-icon" onclick="openEditCategoryModal('{{ finance.id }}', '{{ finance.name | escape }}', '{{ finance.logo | escape }}')" title="Edit Category">
+                            <button class="btn-icon" onclick="event.stopPropagation(); openEditCategoryModal('{{ finance.id }}', '{{ finance.name | escape }}', '{{ finance.logo | escape }}')" title="Edit Category">
                                 <i data-lucide="edit-3"></i>
                             </button>
-                            <button class="btn-icon" onclick="toggleAddForm('add-form-{{ finance.id }}')" title="Add Investment">
+                            <button class="btn-icon" onclick="event.stopPropagation(); toggleAddForm('add-form-{{ finance.id }}')" title="Add Investment">
                                 <i data-lucide="plus-circle"></i>
                             </button>
-                            <a href="/delete_finance/{{ finance.id }}" class="btn-icon text-danger-hover" onclick="return confirm('Are you sure you want to delete this entire category and all its investments?')" title="Delete Category">
+                            <a href="/delete_finance/{{ finance.id }}" class="btn-icon text-danger-hover" onclick="event.stopPropagation(); return confirm('Are you sure you want to delete this entire category and all its investments?')" title="Delete Category">
                                 <i data-lucide="trash-2"></i>
                             </a>
                         </div>
@@ -155,10 +158,10 @@
                                             <div class="inv-actions-amount">
                                                 <span class="inv-amount">₹{{ "{:,.2f}".format(inv.amount) }}</span>
                                                 <div class="inv-hover-actions">
-                                                    <button class="btn-action-icon edit" onclick="openEditModal('{{ inv.id }}', '{{ inv.amount }}', '{{ inv.description }}', '{{ inv.investment_date }}')">
+                                                    <button class="btn-action-icon edit" onclick="event.stopPropagation(); openEditModal('{{ inv.id }}', '{{ inv.amount }}', '{{ inv.description }}', '{{ inv.investment_date }}')">
                                                         <i data-lucide="edit-3"></i>
                                                     </button>
-                                                    <a href="/delete_investment/{{ inv.id }}" class="btn-action-icon delete" onclick="return confirm('Delete this investment?')">
+                                                    <a href="/delete_investment/{{ inv.id }}" class="btn-action-icon delete" onclick="event.stopPropagation(); return confirm('Delete this investment?')">
                                                         <i data-lucide="x"></i>
                                                     </a>
                                                 </div>
@@ -186,6 +189,36 @@
                 </div>
             {% endfor %}
         </main>
+
+        <!-- Portfolio Growth Chart Section -->
+        {% if chart_data and chart_data.labels | length > 0 %}
+        <section id="portfolio-chart-section" class="chart-section glass-card">
+            <div class="chart-header">
+                <div class="chart-title-group">
+                    <div class="chart-icon-wrapper">
+                        <i data-lucide="area-chart"></i>
+                    </div>
+                    <div>
+                        <h2 class="chart-title">Portfolio Growth</h2>
+                        <p class="chart-subtitle">Monthly wealth progression across all categories</p>
+                    </div>
+                </div>
+                <div class="chart-controls">
+                    <button class="chart-toggle-btn active" data-view="cumulative" onclick="switchChartView('cumulative')">
+                        <i data-lucide="trending-up"></i>
+                        Cumulative
+                    </button>
+                    <button class="chart-toggle-btn" data-view="monthly" onclick="switchChartView('monthly')">
+                        <i data-lucide="bar-chart-3"></i>
+                        Monthly
+                    </button>
+                </div>
+            </div>
+            <div class="chart-canvas-wrapper">
+                <canvas id="portfolioChart"></canvas>
+            </div>
+        </section>
+        {% endif %}
     </div>
 
     <!-- Modal: Add Category -->
@@ -435,12 +468,239 @@
             openModal('edit-category-modal');
         }
 
+        // Card redirect helper
+        function redirectToHistory(categoryId) {
+            window.location.href = '/history/' + categoryId;
+        }
+
         // Close modal on outside click
         window.onclick = function(event) {
             if (event.target.classList.contains('modal-overlay')) {
                 event.target.classList.remove('active');
             }
         }
+
+        // --- Portfolio Growth Chart ---
+        {% if chart_data and chart_data.labels | length > 0 %}
+        (function() {
+            const chartData = {{ chart_data | tojson }};
+            const ctx = document.getElementById('portfolioChart').getContext('2d');
+            
+            // Color palette for category lines
+            const categoryColors = [
+                { line: '#6366f1', fill: 'rgba(99, 102, 241, 0.08)' },
+                { line: '#10b981', fill: 'rgba(16, 185, 129, 0.08)' },
+                { line: '#f59e0b', fill: 'rgba(245, 158, 11, 0.08)' },
+                { line: '#f43f5e', fill: 'rgba(244, 63, 94, 0.08)' },
+                { line: '#8b5cf6', fill: 'rgba(139, 92, 246, 0.08)' },
+                { line: '#06b6d4', fill: 'rgba(6, 182, 212, 0.08)' },
+                { line: '#ec4899', fill: 'rgba(236, 72, 153, 0.08)' },
+                { line: '#14b8a6', fill: 'rgba(20, 184, 166, 0.08)' },
+            ];
+
+            // Create main gradient
+            function createGradient(ctx, color1, color2) {
+                const gradient = ctx.createLinearGradient(0, 0, 0, ctx.canvas.height);
+                gradient.addColorStop(0, color1);
+                gradient.addColorStop(1, color2);
+                return gradient;
+            }
+
+            // Build cumulative datasets
+            function getCumulativeDatasets() {
+                const mainGradient = createGradient(ctx, 'rgba(99, 102, 241, 0.25)', 'rgba(99, 102, 241, 0.0)');
+                
+                const datasets = [{
+                    label: 'Total Portfolio Value',
+                    data: chartData.cumulative,
+                    borderColor: '#6366f1',
+                    backgroundColor: mainGradient,
+                    fill: true,
+                    tension: 0.4,
+                    borderWidth: 2.5,
+                    pointBackgroundColor: '#6366f1',
+                    pointBorderColor: '#0f172a',
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 7,
+                    pointHoverBackgroundColor: '#6366f1',
+                    pointHoverBorderColor: '#fff',
+                    pointHoverBorderWidth: 2,
+                }];
+
+                // Add category breakdown lines
+                let colorIndex = 1;
+                for (const [catName, series] of Object.entries(chartData.category_series)) {
+                    const color = categoryColors[colorIndex % categoryColors.length];
+                    datasets.push({
+                        label: catName,
+                        data: series,
+                        borderColor: color.line,
+                        backgroundColor: color.fill,
+                        fill: false,
+                        tension: 0.4,
+                        borderWidth: 1.5,
+                        borderDash: [5, 5],
+                        pointBackgroundColor: color.line,
+                        pointBorderColor: '#0f172a',
+                        pointBorderWidth: 1.5,
+                        pointRadius: 3,
+                        pointHoverRadius: 6,
+                    });
+                    colorIndex++;
+                }
+
+                return datasets;
+            }
+
+            // Build monthly bar-like datasets
+            function getMonthlyDatasets() {
+                const barGradient = createGradient(ctx, 'rgba(16, 185, 129, 0.35)', 'rgba(16, 185, 129, 0.0)');
+                return [{
+                    label: 'Monthly Net Additions',
+                    data: chartData.monthly,
+                    borderColor: '#10b981',
+                    backgroundColor: barGradient,
+                    fill: true,
+                    tension: 0.4,
+                    borderWidth: 2.5,
+                    pointBackgroundColor: '#10b981',
+                    pointBorderColor: '#0f172a',
+                    pointBorderWidth: 2,
+                    pointRadius: 5,
+                    pointHoverRadius: 8,
+                    pointHoverBackgroundColor: '#10b981',
+                    pointHoverBorderColor: '#fff',
+                    pointHoverBorderWidth: 2,
+                }];
+            }
+
+            // Shared chart options
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        align: 'end',
+                        labels: {
+                            color: '#94a3b8',
+                            font: {
+                                family: "'Plus Jakarta Sans', sans-serif",
+                                size: 12,
+                                weight: 500,
+                            },
+                            usePointStyle: true,
+                            pointStyle: 'circle',
+                            padding: 20,
+                            boxWidth: 8,
+                        },
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                        titleColor: '#f8fafc',
+                        bodyColor: '#94a3b8',
+                        borderColor: 'rgba(99, 102, 241, 0.3)',
+                        borderWidth: 1,
+                        cornerRadius: 10,
+                        padding: 14,
+                        titleFont: {
+                            family: "'Plus Jakarta Sans', sans-serif",
+                            size: 13,
+                            weight: 700,
+                        },
+                        bodyFont: {
+                            family: "'Plus Jakarta Sans', sans-serif",
+                            size: 12,
+                        },
+                        displayColors: true,
+                        usePointStyle: true,
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ':  ₹' + context.parsed.y.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                            }
+                        }
+                    },
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.04)',
+                            drawBorder: false,
+                        },
+                        ticks: {
+                            color: '#64748b',
+                            font: {
+                                family: "'Plus Jakarta Sans', sans-serif",
+                                size: 11,
+                                weight: 500,
+                            },
+                            maxRotation: 45,
+                            minRotation: 0,
+                        },
+                        border: {
+                            display: false,
+                        }
+                    },
+                    y: {
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.04)',
+                            drawBorder: false,
+                        },
+                        ticks: {
+                            color: '#64748b',
+                            font: {
+                                family: "'Plus Jakarta Sans', sans-serif",
+                                size: 11,
+                                weight: 500,
+                            },
+                            callback: function(value) {
+                                return '₹' + value.toLocaleString('en-IN');
+                            },
+                            padding: 10,
+                        },
+                        border: {
+                            display: false,
+                        },
+                        beginAtZero: true,
+                    }
+                },
+                animation: {
+                    duration: 800,
+                    easing: 'easeInOutQuart',
+                },
+            };
+
+            // Create chart
+            let portfolioChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartData.labels,
+                    datasets: getCumulativeDatasets(),
+                },
+                options: chartOptions,
+            });
+
+            // Toggle chart view
+            window.switchChartView = function(view) {
+                // Update active button
+                document.querySelectorAll('.chart-toggle-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.view === view);
+                });
+
+                // Update chart data
+                portfolioChart.data.datasets = view === 'cumulative' 
+                    ? getCumulativeDatasets() 
+                    : getMonthlyDatasets();
+                portfolioChart.update('active');
+            };
+        })();
+        {% endif %}
     </script>
 </body>
 </html>

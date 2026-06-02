@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinTracker - Payment History</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="glow-bg"></div>
+    <div class="app-container history-page">
+        <aside class="history-sidebar glass-card">
+            <div class="history-sidebar-header">
+                <div>
+                    <h2>Categories</h2>
+                    <p class="text-muted">Select a category to view its full payment history.</p>
+                </div>
+                <a href="/" class="btn btn-secondary history-back-btn">
+                    <i data-lucide="arrow-left"></i>
+                    Back Home
+                </a>
+            </div>
+
+            <div class="category-list">
+                {% if finances %}
+                    {% for finance in finances %}
+                        <a href="/history/{{ finance.id }}" class="category-list-item {% if selected_finance and selected_finance.id == finance.id %}active{% endif %}">
+                            <div class="category-list-item-label">
+                                <div class="category-logo-wrapper small-logo">
+                                    {% if finance.logo and (finance.logo.startswith('http') or '/' in finance.logo or '.' in finance.logo) %}
+                                        <img src="{{ finance.logo }}" class="category-logo-img" alt="{{ finance.name }}">
+                                    {% else %}
+                                        <i data-lucide="{{ finance.logo or 'wallet' }}"></i>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <span class="category-name">{{ finance.name }}</span>
+                                    <span class="category-subtitle">{{ finance.investments|length }} payments</span>
+                                </div>
+                            </div>
+                            <span class="category-total">₹{{ "{:,.2f}".format(finance.investments|sum(attribute='amount')) }}</span>
+                        </a>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <i data-lucide="folder-plus"></i>
+                        <h3>No categories yet</h3>
+                        <p>Create a portfolio on the home page to start tracking payment history.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </aside>
+
+        <section class="history-content glass-card">
+            <div class="history-header">
+                {% if selected_finance %}
+                    <div>
+                        <h2>{{ selected_finance.name }} Payment History</h2>
+                        <p class="text-muted">Showing all recorded payments for this category.</p>
+                    </div>
+                    <div class="history-summary">
+                        <span>Total payments</span>
+                        <strong>{{ investments|length }}</strong>
+                        <span class="history-summary-amount">₹{{ "{:,.2f}".format(total_amount) }}</span>
+                    </div>
+                {% else %}
+                    <div>
+                        <h2>Payment History</h2>
+                        <p class="text-muted">No category selected yet. Add one from the home page.</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            {% if selected_finance and investments %}
+                <div class="history-table">
+                    <div class="history-table-row history-table-header">
+                        <span>Description</span>
+                        <span>Date</span>
+                        <span>Amount</span>
+                    </div>
+                    {% for inv in investments %}
+                        <div class="history-table-row">
+                            <span>{{ inv.description or 'No description' }}</span>
+                            <span>{{ inv.investment_date.strftime('%b %d, %Y') }}</span>
+                            <span class="history-amount">₹{{ "{:,.2f}".format(inv.amount) }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% elif selected_finance and not investments %}
+                <div class="empty-state">
+                    <i data-lucide="clock"></i>
+                    <h3>No payments recorded</h3>
+                    <p>Add investment entries to this category from the home dashboard.</p>
+                </div>
+            {% endif %}
+        </section>
+    </div>
+
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>

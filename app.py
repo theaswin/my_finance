@@ -1,6 +1,9 @@
-from flask import Flask, render_template, request, redirect
+from flask import Flask, render_template, request, redirect, jsonify
 from datetime import datetime, date
-from models import db, Finance, Investment
+from calendar import monthrange
+from sqlalchemy import func, extract
+from collections import defaultdict
+from models import db, Finance, Investment, PortfolioGrowth
 
 app = Flask(__name__)
 
@@ -10,7 +13,77 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db.init_app(app)
 
 
+def get_monthly_chart_data(current_net_worth=None):
+    """Load monthly portfolio growth from portfolio_growth and append current month value when needed."""
+    if current_net_worth is None:
+        current_net_worth = sum(inv.amount for inv in Investment.query.all())
 
+    growth_records = PortfolioGrowth.query.order_by(PortfolioGrowth.year, PortfolioGrowth.month).all()
+    labels = []
+    totals = []
+    for record in growth_records:
+        labels.append(record.date)
+        totals.append(round(record.total, 2))
+
+    today = date.today()
+    current_label = today.strftime("%Y %b")
+    month_last_day = monthrange(today.year, today.month)[1]
+    current_month_complete = today.day == month_last_day
+    current_total = round(current_net_worth, 2)
+
+    if not growth_records:
+        if current_net_worth > 0:
+            labels.append(current_label)
+            totals.append(current_total)
+    else:
+        if not current_month_complete:
+            if labels and labels[-1] == current_label:
+                totals[-1] = current_total
+            else:
+                labels.append(current_label)
+                totals.append(current_total)
+        else:
+            if labels and labels[-1] != current_label:
+                labels.append(current_label)
+                totals.append(current_total)
+
+    monthly_changes = []
+    for index, total in enumerate(totals):
+        if index == 0:
+            monthly_changes.append(total)
+        else:
+            monthly_changes.append(round(total - totals[index - 1], 2))
+
+    investments = Investment.query.order_by(Investment.investment_date).all()
+    category_data = {}
+    for inv in investments:
+        cat_name = inv.finance.name
+        if cat_name not in category_data:
+            category_data[cat_name] = defaultdict(float)
+        key = inv.investment_date.strftime("%Y-%m")
+        category_data[cat_name][key] += inv.amount
+
+    category_series = {}
+    if growth_records:
+        # Use the ordered growth labels when mapping category series for display.
+        month_keys = [datetime.strptime(label, "%Y %b").strftime("%Y-%m") for label in labels]
+    else:
+        month_keys = []
+
+    for cat_name, monthly in category_data.items():
+        series = []
+        running = 0
+        for month_key in month_keys:
+            running += monthly.get(month_key, 0)
+            series.append(round(running, 2))
+        category_series[cat_name] = series
+
+    return {
+        "labels": labels,
+        "cumulative": totals,
+        "monthly": monthly_changes,
+        "category_series": category_series,
+    }
 
 
 @app.route("/")
@@ -27,14 +100,58 @@ def home():
         f.total_amount = category_total
         total_balance += category_total
         total_investments_count += len(f.investments)
+    
+    chart_data = get_monthly_chart_data(total_balance)
+    today_date = date.today().isoformat()
         
     return render_template(
         "index.html",
         finances=finances,
         total_balance=total_balance,
         total_investments_count=total_investments_count,
-        categories_count=len(finances)
+        categories_count=len(finances),
+        chart_data=chart_data,
+        today_date=today_date,
     )
+
+
+@app.route("/history")
+@app.route("/history/<int:finance_id>")
+def payment_history(finance_id=None):
+    finances = Finance.query.order_by(Finance.name).all()
+    selected_finance = None
+
+    if finance_id is not None:
+        selected_finance = db.session.get(Finance, finance_id)
+    elif finances:
+        selected_finance = finances[0]
+
+    if selected_finance is None and finances:
+        return redirect(f"/history/{finances[0].id}")
+
+    investments = []
+    total_amount = 0.0
+    if selected_finance:
+        investments = sorted(
+            selected_finance.investments,
+            key=lambda inv: inv.investment_date,
+            reverse=True,
+        )
+        total_amount = sum(inv.amount for inv in investments)
+
+    return render_template(
+        "history.html",
+        finances=finances,
+        selected_finance=selected_finance,
+        investments=investments,
+        total_amount=total_amount,
+    )
+
+
+@app.route("/api/chart_data")
+def api_chart_data():
+    """JSON API for chart data (useful for future AJAX refresh)."""
+    return jsonify(get_monthly_chart_data())
 
 
 @app.route("/add_finance", methods=["POST"])
