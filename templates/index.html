@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinTracker - Personal Wealth Dashboard</title>
+    
+    <!-- Google Fonts: Plus Jakarta Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Custom Style Sheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="glow-bg"></div>
+    
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header glass-card">
+            <div class="logo-section">
+                <div class="logo-icon">
+                    <i data-lucide="wallet-cards"></i>
+                </div>
+                <div>
+                    <h1>FinTracker</h1>
+                    <p class="subtitle">Personal Portfolio Tracker</p>
+                </div>
+            </div>
+            
+            <button class="btn btn-primary" onclick="openModal('add-category-modal')">
+                <i data-lucide="plus"></i> New Category
+            </button>
+        </header>
+
+        <!-- Metrics Dashboard -->
+        <section class="metrics-grid">
+            <div class="metric-card glass-card border-glow-success">
+                <div class="metric-info">
+                    <span class="metric-label">Total Portfolio Net Worth</span>
+                    <h2 class="metric-value text-success">₹{{ "{:,.2f}".format(total_balance) }}</h2>
+                </div>
+                <div class="metric-icon bg-success-glow">
+                    <i data-lucide="trending-up" class="text-success"></i>
+                </div>
+            </div>
+            
+            <div class="metric-card glass-card border-glow-primary">
+                <div class="metric-info">
+                    <span class="metric-label">Active Portfolios</span>
+                    <h2 class="metric-value text-primary">{{ categories_count }}</h2>
+                </div>
+                <div class="metric-icon bg-primary-glow">
+                    <i data-lucide="layers" class="text-primary"></i>
+                </div>
+            </div>
+
+            <div class="metric-card glass-card border-glow-warning">
+                <div class="metric-info">
+                    <span class="metric-label">Total Transactions</span>
+                    <h2 class="metric-value text-warning">{{ total_investments_count }}</h2>
+                </div>
+                <div class="metric-icon bg-warning-glow">
+                    <i data-lucide="activity" class="text-warning"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- Categories & Investments Grid -->
+        <main class="finance-grid">
+            {% for finance in finances %}
+                <div class="finance-card glass-card">
+                    <!-- Card Header -->
+                    <div class="card-header">
+                        <div class="category-meta">
+                            <div class="category-logo-wrapper">
+                                <i data-lucide="{{ finance.logo or 'wallet' }}"></i>
+                            </div>
+                            <div>
+                                <h3>{{ finance.name }}</h3>
+                                <span class="badge">{{ finance.investments|length }} items</span>
+                            </div>
+                        </div>
+                        <div class="card-actions">
+                            <button class="btn-icon" onclick="toggleAddForm('add-form-{{ finance.id }}')" title="Add Investment">
+                                <i data-lucide="plus-circle"></i>
+                            </button>
+                            <a href="/delete_finance/{{ finance.id }}" class="btn-icon text-danger-hover" onclick="return confirm('Are you sure you want to delete this entire category and all its investments?')" title="Delete Category">
+                                <i data-lucide="trash-2"></i>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Card Body -->
+                    <div class="card-body">
+                        <!-- Category Balance -->
+                        <div class="category-balance-section">
+                            <span class="balance-label">Total Allocated</span>
+                            <div class="balance-value">₹{{ "{:,.2f}".format(finance.total_amount) }}</div>
+                        </div>
+
+                        <!-- Collapsible Form: Add Investment -->
+                        <div id="add-form-{{ finance.id }}" class="collapsible-form-container">
+                            <form method="POST" action="/add_investment" class="compact-form">
+                                <input type="hidden" name="finance_id" value="{{ finance.id }}">
+                                
+                                <div class="form-group">
+                                    <input type="text" name="description" placeholder="Description (e.g., Apple stock, Savings)" required>
+                                </div>
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <input type="number" step="0.01" name="amount" placeholder="Amount (₹)" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <input type="date" name="investment_date" value="{{ today_date }}" required>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-actions">
+                                    <button type="submit" class="btn btn-success btn-sm w-full">Save Investment</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Investments List -->
+                        <div class="investments-list">
+                            {% if finance.investments %}
+                                <div class="list-header">
+                                    <span>Details</span>
+                                    <span class="text-right">Amount</span>
+                                </div>
+                                <div class="list-scrollable">
+                                    {% for inv in finance.investments | sort(attribute='investment_date', reverse=True) %}
+                                        <div class="investment-row">
+                                            <div class="inv-details">
+                                                <span class="inv-desc">{{ inv.description }}</span>
+                                                <span class="inv-date">{{ inv.investment_date.strftime('%b %d, %Y') }}</span>
+                                            </div>
+                                            <div class="inv-actions-amount">
+                                                <span class="inv-amount">₹{{ "{:,.2f}".format(inv.amount) }}</span>
+                                                <div class="inv-hover-actions">
+                                                    <button class="btn-action-icon edit" onclick="openEditModal('{{ inv.id }}', '{{ inv.amount }}', '{{ inv.description }}', '{{ inv.investment_date }}')">
+                                                        <i data-lucide="edit-3"></i>
+                                                    </button>
+                                                    <a href="/delete_investment/{{ inv.id }}" class="btn-action-icon delete" onclick="return confirm('Delete this investment?')">
+                                                        <i data-lucide="x"></i>
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <div class="empty-state">
+                                    <i data-lucide="inbox"></i>
+                                    <p>No investments logged. Add one above!</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <div class="global-empty-state glass-card">
+                    <i data-lucide="folder-plus"></i>
+                    <h2>No Finance Portfolios Yet</h2>
+                    <p>Create a category like "Stock Market", "Crypto Assets", or "High-Yield Savings" to start tracking your assets.</p>
+                    <button class="btn btn-primary mt-4" onclick="openModal('add-category-modal')">
+                        Create Category
+                    </button>
+                </div>
+            {% endfor %}
+        </main>
+    </div>
+
+    <!-- Modal: Add Category -->
+    <div id="add-category-modal" class="modal-overlay">
+        <div class="modal-container glass-card">
+            <div class="modal-header">
+                <h2>Create Portfolio Category</h2>
+                <button class="btn-close" onclick="closeModal('add-category-modal')">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <form method="POST" action="/add_finance">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="cat-name">Category Name</label>
+                        <input type="text" id="cat-name" name="name" placeholder="e.g. Stocks, Crypto, Real Estate" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Select Icon Representation</label>
+                        <div class="icon-selector-grid">
+                            <label class="icon-option">
+                                <input type="radio" name="logo" value="trending-up" checked>
+                                <span class="icon-box"><i data-lucide="trending-up"></i></span>
+                                <span class="icon-label">Stocks</span>
+                            </label>
+                            
+                            <label class="icon-option">
+                                <input type="radio" name="logo" value="coins">
+                                <span class="icon-box"><i data-lucide="coins"></i></span>
+                                <span class="icon-label">Crypto</span>
+                            </label>
+
+                            <label class="icon-option">
+                                <input type="radio" name="logo" value="piggy-bank">
+                                <span class="icon-box"><i data-lucide="piggy-bank"></i></span>
+                                <span class="icon-label">Savings</span>
+                            </label>
+
+                            <label class="icon-option">
+                                <input type="radio" name="logo" value="home">
+                                <span class="icon-box"><i data-lucide="home"></i></span>
+                                <span class="icon-label">Property</span>
+                            </label>
+
+                            <label class="icon-option">
+                                <input type="radio" name="logo" value="landmark">
+                                <span class="icon-box"><i data-lucide="landmark"></i></span>
+                                <span class="icon-label">Bank</span>
+                            </label>
+
+                            <label class="icon-option">
+                                <input type="radio" name="logo" value="wallet">
+                                <span class="icon-box"><i data-lucide="wallet"></i></span>
+                                <span class="icon-label">Other</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('add-category-modal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Portfolio</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Edit Investment -->
+    <div id="edit-investment-modal" class="modal-overlay">
+        <div class="modal-container glass-card">
+            <div class="modal-header">
+                <h2>Update Investment Entry</h2>
+                <button class="btn-close" onclick="closeModal('edit-investment-modal')">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <form method="POST" action="/update_investment">
+                <input type="hidden" id="edit-inv-id" name="investment_id">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="edit-inv-desc">Description</label>
+                        <input type="text" id="edit-inv-desc" name="description" required>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-inv-amount">Amount (₹)</label>
+                            <input type="number" step="0.01" id="edit-inv-amount" name="amount" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-inv-date">Investment Date</label>
+                            <input type="date" id="edit-inv-date" name="investment_date" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('edit-investment-modal')">Cancel</button>
+                    <button type="submit" class="btn btn-success">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Auto-fill today's date in add forms
+        document.addEventListener('DOMContentLoaded', () => {
+            const today = new Date().toISOString().split('T')[0];
+            document.querySelectorAll('input[type="date"]').forEach(input => {
+                if (!input.value) {
+                    input.value = today;
+                }
+            });
+        });
+
+        // Toggle Expandable Forms
+        function toggleAddForm(formId) {
+            const form = document.getElementById(formId);
+            if (form.classList.contains('active')) {
+                form.classList.remove('active');
+            } else {
+                form.classList.add('active');
+                form.querySelector('input').focus();
+            }
+        }
+
+        // Modal Controls
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('active');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        // Edit Investment Modal Prep
+        function openEditModal(id, amount, description, dateString) {
+            document.getElementById('edit-inv-id').value = id;
+            document.getElementById('edit-inv-amount').value = parseFloat(amount);
+            document.getElementById('edit-inv-desc').value = description;
+            
+            // Handle date conversion if needed
+            document.getElementById('edit-inv-date').value = dateString;
+            
+            openModal('edit-investment-modal');
+        }
+
+        // Close modal on outside click
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal-overlay')) {
+                event.target.classList.remove('active');
+            }
+        }
+    </script>
+</body>
+</html>
