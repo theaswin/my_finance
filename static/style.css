@@ -59,7 +59,7 @@ body {
 }
 
 .app-container {
-    max-width: 1200px;
+    max-width: 1600px;
     margin: 0 auto;
     padding: 40px 20px;
     display: flex;
@@ -78,12 +78,44 @@ body {
     transition: var(--transition);
 }
 
-/* --- Header --- */
+/* --- Header & Combined Header --- */
 .app-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 24px 32px;
+}
+
+.combined-header {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 24px;
+}
+
+.combined-header .header-item {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+}
+
+.combined-header .logo-section {
+    flex: 1.3;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.combined-header .logo-icon {
+    flex-shrink: 0;
+}
+
+.combined-header .logo-text {
+    display: flex;
+    flex-direction: column;
 }
 
 .logo-section {
@@ -93,9 +125,9 @@ body {
 }
 
 .logo-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
+    width: 60px;
+    height: 60px;
+    border-radius: 14px;
     background: linear-gradient(135deg, var(--primary) 0%, #a855f7 100%);
     display: flex;
     justify-content: center;
@@ -104,8 +136,8 @@ body {
 }
 
 .logo-icon i {
-    width: 24px;
-    height: 24px;
+    width: 32px;
+    height: 32px;
     color: white;
 }
 
@@ -118,59 +150,83 @@ body {
 .subtitle {
     color: var(--text-muted);
     font-size: 13px;
+    white-space: nowrap;
 }
 
-/* --- Metric Cards --- */
-.metrics-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 20px;
-}
-
-.metric-card {
+/* --- Combined Header Metrics --- */
+.combined-header .header-metric {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 12px 18px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 24px;
-    position: relative;
+    transition: var(--transition);
+    flex: 1;
+}
+
+.combined-header .header-metric:hover {
+    border-color: var(--border-hover);
+    background: var(--bg-card-hover);
+    transform: translateY(-2px);
+}
+
+.combined-header .metric-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
     overflow: hidden;
 }
 
-.metric-info {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.metric-label {
-    font-size: 13px;
+.combined-header .metric-label {
+    font-size: 10px;
     font-weight: 600;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
 }
 
-.metric-value {
-    font-size: 28px;
+.combined-header .metric-value {
+    font-size: 20px;
     font-weight: 800;
     letter-spacing: -0.5px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
 }
 
-.metric-icon {
-    width: 50px;
-    height: 50px;
-    border-radius: 12px;
+.combined-header .metric-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
 }
 
-.metric-icon i {
-    width: 24px;
-    height: 24px;
+.combined-header .metric-icon i {
+    width: 18px;
+    height: 18px;
 }
 
-/* Specific glows */
+.combined-header .action-section {
+    flex: 0.9;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.combined-header .action-section .btn {
+    width: auto;
+    white-space: nowrap;
+}
+
+/* Base glow definitions */
 .border-glow-success:hover {
     border-color: rgba(16, 185, 129, 0.3);
     box-shadow: 0 10px 30px -10px rgba(16, 185, 129, 0.15);
@@ -195,14 +251,14 @@ body {
 /* --- Category and Cards Grid --- */
 .finance-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-    gap: 24px;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 20px;
 }
 
 .finance-card {
     display: flex;
     flex-direction: column;
-    padding: 24px;
+    padding: 20px;
     height: 100%;
 }
 
@@ -229,9 +285,9 @@ body {
 }
 
 .category-logo-wrapper {
-    width: 42px;
-    height: 42px;
-    border-radius: 10px;
+    width: 52px;
+    height: 52px;
+    border-radius: 12px;
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
     border: 1px solid var(--border-color);
     display: flex;
@@ -241,8 +297,15 @@ body {
 }
 
 .category-logo-wrapper i {
-    width: 20px;
-    height: 20px;
+    width: 28px;
+    height: 28px;
+}
+
+.category-logo-img {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    border-radius: 6px;
 }
 
 .card-header h3 {
@@ -312,7 +375,11 @@ body {
     gap: 10px;
 }
 
-.form-row .form-group {
+.form-row .form-group:first-child {
+    flex: 1.8;
+}
+
+.form-row .form-group:last-child {
     flex: 1;
 }
 
@@ -771,23 +838,48 @@ select:focus {
 }
 
 /* --- Responsiveness Media Queries --- */
-@media (max-width: 768px) {
-    .app-header {
+@media (max-width: 1400px) {
+    .finance-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+@media (max-width: 1100px) {
+    .finance-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 900px) {
+    .combined-header {
         flex-direction: column;
-        gap: 16px;
-        align-items: stretch;
+        gap: 20px;
+        padding: 24px;
+    }
+    
+    .combined-header .header-item {
+        width: 100%;
+        justify-content: center;
         text-align: center;
     }
     
-    .logo-section {
+    .combined-header .logo-section {
         flex-direction: column;
         gap: 8px;
     }
     
-    .metrics-grid {
-        grid-template-columns: 1fr;
+    .combined-header .action-section {
+        justify-content: center;
     }
-    
+}
+
+@media (max-width: 800px) {
+    .finance-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 550px) {
     .finance-grid {
         grid-template-columns: 1fr;
     }

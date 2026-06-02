@@ -40,13 +40,30 @@ def home():
 @app.route("/add_finance", methods=["POST"])
 def add_finance():
     name = request.form.get("name", "").strip()
-    logo = request.form.get("logo", "wallet").strip()
+    custom_logo = request.form.get("custom_logo", "").strip()
+    logo = custom_logo if custom_logo else request.form.get("logo", "wallet").strip()
     
     if name:
         finance = Finance(name=name, logo=logo)
         db.session.add(finance)
         db.session.commit()
 
+    return redirect("/")
+
+
+@app.route("/edit_finance/<int:id>", methods=["POST"])
+def edit_finance(id):
+    finance = db.session.get(Finance, id)
+    if finance:
+        name = request.form.get("name", "").strip()
+        custom_logo = request.form.get("custom_logo", "").strip()
+        logo = custom_logo if custom_logo else request.form.get("logo", "wallet").strip()
+        
+        if name:
+            finance.name = name
+            finance.logo = logo
+            db.session.commit()
+            
     return redirect("/")
 
 

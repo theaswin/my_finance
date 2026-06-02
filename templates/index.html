@@ -20,28 +20,23 @@
     <div class="glow-bg"></div>
     
     <div class="app-container">
-        <!-- Header -->
-        <header class="app-header glass-card">
-            <div class="logo-section">
+        <!-- Combined Header & Metrics Row (Single Line) -->
+        <header class="app-header glass-card combined-header">
+            <!-- Div 1: Logo & Title Section -->
+            <div class="logo-section header-item">
                 <div class="logo-icon">
                     <i data-lucide="wallet-cards"></i>
                 </div>
-                <div>
+                <div class="logo-text">
                     <h1>FinTracker</h1>
                     <p class="subtitle">Personal Portfolio Tracker</p>
                 </div>
             </div>
             
-            <button class="btn btn-primary" onclick="openModal('add-category-modal')">
-                <i data-lucide="plus"></i> New Category
-            </button>
-        </header>
-
-        <!-- Metrics Dashboard -->
-        <section class="metrics-grid">
-            <div class="metric-card glass-card border-glow-success">
+            <!-- Div 2: Total Net Worth -->
+            <div class="header-metric header-item border-glow-success">
                 <div class="metric-info">
-                    <span class="metric-label">Total Portfolio Net Worth</span>
+                    <span class="metric-label">Net Worth</span>
                     <h2 class="metric-value text-success">₹{{ "{:,.2f}".format(total_balance) }}</h2>
                 </div>
                 <div class="metric-icon bg-success-glow">
@@ -49,7 +44,8 @@
                 </div>
             </div>
             
-            <div class="metric-card glass-card border-glow-primary">
+            <!-- Div 3: Active Portfolios -->
+            <div class="header-metric header-item border-glow-primary">
                 <div class="metric-info">
                     <span class="metric-label">Active Portfolios</span>
                     <h2 class="metric-value text-primary">{{ categories_count }}</h2>
@@ -59,7 +55,8 @@
                 </div>
             </div>
 
-            <div class="metric-card glass-card border-glow-warning">
+            <!-- Div 4: Total Transactions -->
+            <div class="header-metric header-item border-glow-warning">
                 <div class="metric-info">
                     <span class="metric-label">Total Transactions</span>
                     <h2 class="metric-value text-warning">{{ total_investments_count }}</h2>
@@ -68,7 +65,14 @@
                     <i data-lucide="activity" class="text-warning"></i>
                 </div>
             </div>
-        </section>
+
+            <!-- Div 5: Action Button Section -->
+            <div class="action-section header-item">
+                <button class="btn btn-primary" onclick="openModal('add-category-modal')">
+                    <i data-lucide="plus"></i> New Category
+                </button>
+            </div>
+        </header>
 
         <!-- Categories & Investments Grid -->
         <main class="finance-grid">
@@ -78,7 +82,11 @@
                     <div class="card-header">
                         <div class="category-meta">
                             <div class="category-logo-wrapper">
-                                <i data-lucide="{{ finance.logo or 'wallet' }}"></i>
+                                {% if finance.logo and (finance.logo.startswith('http') or '/' in finance.logo or '.' in finance.logo) %}
+                                    <img src="{{ finance.logo }}" class="category-logo-img" alt="{{ finance.name }}">
+                                {% else %}
+                                    <i data-lucide="{{ finance.logo or 'wallet' }}"></i>
+                                {% endif %}
                             </div>
                             <div>
                                 <h3>{{ finance.name }}</h3>
@@ -86,6 +94,9 @@
                             </div>
                         </div>
                         <div class="card-actions">
+                            <button class="btn-icon" onclick="openEditCategoryModal('{{ finance.id }}', '{{ finance.name | escape }}', '{{ finance.logo | escape }}')" title="Edit Category">
+                                <i data-lucide="edit-3"></i>
+                            </button>
                             <button class="btn-icon" onclick="toggleAddForm('add-form-{{ finance.id }}')" title="Add Investment">
                                 <i data-lucide="plus-circle"></i>
                             </button>
@@ -192,6 +203,11 @@
                         <label for="cat-name">Category Name</label>
                         <input type="text" id="cat-name" name="name" placeholder="e.g. Stocks, Crypto, Real Estate" required>
                     </div>
+
+                    <div class="form-group">
+                        <label for="cat-custom-logo">Custom Icon Image URL (Optional)</label>
+                        <input type="text" id="cat-custom-logo" name="custom_logo" placeholder="https://example.com/logo.png (Overrides preset icon below)">
+                    </div>
                     
                     <div class="form-group">
                         <label>Select Icon Representation</label>
@@ -237,6 +253,76 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('add-category-modal')">Cancel</button>
                     <button type="submit" class="btn btn-primary">Create Portfolio</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Edit Category -->
+    <div id="edit-category-modal" class="modal-overlay">
+        <div class="modal-container glass-card">
+            <div class="modal-header">
+                <h2>Edit Portfolio Category</h2>
+                <button class="btn-close" onclick="closeModal('edit-category-modal')">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <form id="edit-category-form" method="POST" action="">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="edit-cat-name">Category Name</label>
+                        <input type="text" id="edit-cat-name" name="name" placeholder="e.g. Stocks, Crypto, Real Estate" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="edit-cat-custom-logo">Custom Icon Image URL (Optional)</label>
+                        <input type="text" id="edit-cat-custom-logo" name="custom_logo" placeholder="https://example.com/logo.png (Overrides preset icon below)">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Select Icon Representation</label>
+                        <div class="icon-selector-grid">
+                            <label class="icon-option">
+                                <input type="radio" name="logo" id="edit-logo-trending-up" value="trending-up">
+                                <span class="icon-box"><i data-lucide="trending-up"></i></span>
+                                <span class="icon-label">Stocks</span>
+                            </label>
+                            
+                            <label class="icon-option">
+                                <input type="radio" name="logo" id="edit-logo-coins" value="coins">
+                                <span class="icon-box"><i data-lucide="coins"></i></span>
+                                <span class="icon-label">Crypto</span>
+                            </label>
+
+                            <label class="icon-option">
+                                <input type="radio" name="logo" id="edit-logo-piggy-bank" value="piggy-bank">
+                                <span class="icon-box"><i data-lucide="piggy-bank"></i></span>
+                                <span class="icon-label">Savings</span>
+                            </label>
+
+                            <label class="icon-option">
+                                <input type="radio" name="logo" id="edit-logo-home" value="home">
+                                <span class="icon-box"><i data-lucide="home"></i></span>
+                                <span class="icon-label">Property</span>
+                            </label>
+
+                            <label class="icon-option">
+                                <input type="radio" name="logo" id="edit-logo-landmark" value="landmark">
+                                <span class="icon-box"><i data-lucide="landmark"></i></span>
+                                <span class="icon-label">Bank</span>
+                            </label>
+
+                            <label class="icon-option">
+                                <input type="radio" name="logo" id="edit-logo-wallet" value="wallet">
+                                <span class="icon-box"><i data-lucide="wallet"></i></span>
+                                <span class="icon-label">Other</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('edit-category-modal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
                 </div>
             </form>
         </div>
@@ -322,6 +408,31 @@
             document.getElementById('edit-inv-date').value = dateString;
             
             openModal('edit-investment-modal');
+        }
+
+        // Edit Category Modal Prep
+        function openEditCategoryModal(id, name, logo) {
+            document.getElementById('edit-category-form').action = '/edit_finance/' + id;
+            document.getElementById('edit-cat-name').value = name;
+            
+            const isUrl = logo.startsWith('http') || logo.includes('/') || logo.includes('.');
+            if (isUrl) {
+                document.getElementById('edit-cat-custom-logo').value = logo;
+                document.querySelectorAll('#edit-category-modal input[type="radio"]').forEach(radio => {
+                    radio.checked = false;
+                });
+            } else {
+                document.getElementById('edit-cat-custom-logo').value = '';
+                const targetRadio = document.getElementById('edit-logo-' + logo);
+                if (targetRadio) {
+                    targetRadio.checked = true;
+                } else {
+                    const defaultRadio = document.getElementById('edit-logo-wallet');
+                    if (defaultRadio) defaultRadio.checked = true;
+                }
+            }
+            
+            openModal('edit-category-modal');
         }
 
         // Close modal on outside click
