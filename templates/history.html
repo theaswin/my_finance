@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FinTracker - Payment History</title>
+    <title>FinTracker - Category Details</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -12,96 +12,123 @@
 </head>
 <body>
     <div class="glow-bg"></div>
-    <div class="app-container history-page">
-        <aside class="history-sidebar glass-card">
-            <div class="history-sidebar-header">
-                <div>
-                    <h2>Categories</h2>
-                    <p class="text-muted">Select a category to view its full payment history.</p>
-                </div>
-                <a href="/" class="btn btn-secondary history-back-btn">
-                    <i data-lucide="arrow-left"></i>
-                    Back Home
-                </a>
-            </div>
+    <div class="app-container single-column-container">
+        
+        <!-- Navigation Back Bar -->
+        <div class="nav-bar">
+            <a href="/" class="btn btn-secondary btn-sm">
+                <i data-lucide="arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
 
-            <div class="category-list">
-                {% if finances %}
-                    {% for finance in finances %}
-                        <a href="/history/{{ finance.id }}" class="category-list-item {% if selected_finance and selected_finance.id == finance.id %}active{% endif %}">
-                            <div class="category-list-item-label">
-                                <div class="category-logo-wrapper small-logo">
-                                    {% if finance.logo and (finance.logo.startswith('http') or '/' in finance.logo or '.' in finance.logo) %}
-                                        <img src="{{ finance.logo }}" class="category-logo-img" alt="{{ finance.name }}">
-                                    {% else %}
-                                        <i data-lucide="{{ finance.logo or 'wallet' }}"></i>
-                                    {% endif %}
-                                </div>
-                                <div>
-                                    <span class="category-name">{{ finance.name }}</span>
-                                    <span class="category-subtitle">{{ finance.investments|length }} payments</span>
-                                </div>
+        {% if selected_finance %}
+            <!-- Category Premium Header Card -->
+            <header class="category-detail-header glass-card">
+                <div class="header-left">
+                    <div class="category-logo-wrapper large-logo">
+                        {% if selected_finance.logo and (selected_finance.logo.startswith('http') or '/' in selected_finance.logo or '.' in selected_finance.logo) %}
+                            <img src="{{ selected_finance.logo }}" class="category-logo-img large-logo-img" alt="{{ selected_finance.name }}">
+                        {% else %}
+                            <i data-lucide="{{ selected_finance.logo or 'wallet' }}"></i>
+                        {% endif %}
+                    </div>
+                    <div class="category-identity">
+                        <h2>{{ selected_finance.name }}</h2>
+                        <span class="badge">{{ investments|length }} payments total</span>
+                    </div>
+                </div>
+                
+                <div class="header-right">
+                    <div class="metric-block">
+                        <span class="metric-label">Total Allocated</span>
+                        <h1 class="metric-value text-success">₹{{ "{:,.2f}".format(total_amount) }}</h1>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Quick Add Transaction Card (Inline / Glass) -->
+            <section class="quick-add-section glass-card">
+                <div class="section-header">
+                    <h3><i data-lucide="plus-circle" class="text-primary"></i> Add New Payment</h3>
+                </div>
+                <form method="POST" action="/add_investment" class="quick-add-form">
+                    <input type="hidden" name="finance_id" value="{{ selected_finance.id }}">
+                    <div class="form-row">
+                        <div class="form-group flex-2">
+                            <label>Description</label>
+                            <input type="text" name="description" placeholder="e.g. Monthly allocation, Dividend" required>
+                        </div>
+                        <div class="form-group flex-1">
+                            <label>Amount (₹)</label>
+                            <input type="number" step="0.01" name="amount" placeholder="Amount" required>
+                        </div>
+                        <div class="form-group flex-1">
+                            <label>Date</label>
+                            <input type="date" name="investment_date" id="quick-add-date" required>
+                        </div>
+                        <div class="form-group btn-group-align">
+                            <button type="submit" class="btn btn-success w-full">
+                                <i data-lucide="save"></i> Save Payment
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </section>
+
+            <!-- Read-Only Payment History Table Card -->
+            <section class="history-content-card glass-card">
+                <div class="section-header">
+                    <h3><i data-lucide="clock" class="text-warning"></i> Payment History</h3>
+                    <p class="text-muted">Chronological view of all investments in this category</p>
+                </div>
+                
+                {% if investments %}
+                    <div class="history-table">
+                        <div class="history-table-row history-table-header">
+                            <span>Description</span>
+                            <span>Date</span>
+                            <span class="text-right">Amount</span>
+                        </div>
+                        {% for inv in investments %}
+                            <div class="history-table-row">
+                                <span class="inv-description-text">{{ inv.description or 'No description' }}</span>
+                                <span class="inv-date-text">{{ inv.investment_date.strftime('%b %d, %Y') }}</span>
+                                <span class="history-amount">₹{{ "{:,.2f}".format(inv.amount) }}</span>
                             </div>
-                            <span class="category-total">₹{{ "{:,.2f}".format(finance.investments|sum(attribute='amount')) }}</span>
-                        </a>
-                    {% endfor %}
+                        {% endfor %}
+                    </div>
                 {% else %}
                     <div class="empty-state">
-                        <i data-lucide="folder-plus"></i>
-                        <h3>No categories yet</h3>
-                        <p>Create a portfolio on the home page to start tracking payment history.</p>
+                        <i data-lucide="inbox"></i>
+                        <h3>No payments recorded yet</h3>
+                        <p>Use the form above to add your first transaction to this category.</p>
                     </div>
                 {% endif %}
-            </div>
-        </aside>
+            </section>
 
-        <section class="history-content glass-card">
-            <div class="history-header">
-                {% if selected_finance %}
-                    <div>
-                        <h2>{{ selected_finance.name }} Payment History</h2>
-                        <p class="text-muted">Showing all recorded payments for this category.</p>
-                    </div>
-                    <div class="history-summary">
-                        <span>Total payments</span>
-                        <strong>{{ investments|length }}</strong>
-                        <span class="history-summary-amount">₹{{ "{:,.2f}".format(total_amount) }}</span>
-                    </div>
-                {% else %}
-                    <div>
-                        <h2>Payment History</h2>
-                        <p class="text-muted">No category selected yet. Add one from the home page.</p>
-                    </div>
-                {% endif %}
+        {% else %}
+            <!-- No Category Selected / Empty Workspace -->
+            <div class="global-empty-state glass-card">
+                <i data-lucide="alert-circle"></i>
+                <h2>No Category Selected</h2>
+                <p>Please return to the dashboard to select or create a category.</p>
+                <a href="/" class="btn btn-primary mt-4">
+                    Go to Dashboard
+                </a>
             </div>
-
-            {% if selected_finance and investments %}
-                <div class="history-table">
-                    <div class="history-table-row history-table-header">
-                        <span>Description</span>
-                        <span>Date</span>
-                        <span>Amount</span>
-                    </div>
-                    {% for inv in investments %}
-                        <div class="history-table-row">
-                            <span>{{ inv.description or 'No description' }}</span>
-                            <span>{{ inv.investment_date.strftime('%b %d, %Y') }}</span>
-                            <span class="history-amount">₹{{ "{:,.2f}".format(inv.amount) }}</span>
-                        </div>
-                    {% endfor %}
-                </div>
-            {% elif selected_finance and not investments %}
-                <div class="empty-state">
-                    <i data-lucide="clock"></i>
-                    <h3>No payments recorded</h3>
-                    <p>Add investment entries to this category from the home dashboard.</p>
-                </div>
-            {% endif %}
-        </section>
+        {% endif %}
     </div>
 
     <script>
         lucide.createIcons();
+
+        // Autofill today's date in quick add form
+        document.addEventListener('DOMContentLoaded', () => {
+            const dateInput = document.getElementById('quick-add-date');
+            if (dateInput && !dateInput.value) {
+                dateInput.value = new Date().toISOString().split('T')[0];
+            }
+        });
     </script>
 </body>
 </html>

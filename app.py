@@ -13,71 +13,80 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db.init_app(app)
 
 
-def get_monthly_chart_data(current_net_worth=None):
-    """Load monthly portfolio growth from portfolio_growth and append current month value when needed."""
-    if current_net_worth is None:
-        current_net_worth = sum(inv.amount for inv in Investment.query.all())
+def sync_portfolio_growth():
+    """Synchronize the PortfolioGrowth table for each month of the current year."""
+    today = date.today()
+    current_year = today.year
+    month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    
+    all_investments = Investment.query.all()
+    
+    for m in range(1, 13):
+        label = f"{current_year} {month_names[m-1]}"
+        last_day = date(current_year, m, monthrange(current_year, m)[1])
+        
+        # Calculate the cumulative total up to the last day of this month
+        total_for_month = sum(inv.amount for inv in all_investments if inv.investment_date <= last_day)
+        
+        # Check if record already exists
+        record = PortfolioGrowth.query.filter_by(year=current_year, month=m).first()
+        if record:
+            record.total = round(total_for_month, 2)
+            record.date = label
+        else:
+            new_record = PortfolioGrowth(
+                date=label,
+                year=current_year,
+                month=m,
+                total=round(total_for_month, 2)
+            )
+            db.session.add(new_record)
+            
+    db.session.commit()
 
+
+def get_monthly_chart_data(current_net_worth=None):
+    """Load monthly portfolio growth from PortfolioGrowth database table and calculate category breakdowns."""
+    # Sync database records first
+    sync_portfolio_growth()
+    
     growth_records = PortfolioGrowth.query.order_by(PortfolioGrowth.year, PortfolioGrowth.month).all()
+    
     labels = []
     totals = []
     for record in growth_records:
         labels.append(record.date)
         totals.append(round(record.total, 2))
-
-    today = date.today()
-    current_label = today.strftime("%Y %b")
-    month_last_day = monthrange(today.year, today.month)[1]
-    current_month_complete = today.day == month_last_day
-    current_total = round(current_net_worth, 2)
-
-    if not growth_records:
-        if current_net_worth > 0:
-            labels.append(current_label)
-            totals.append(current_total)
-    else:
-        if not current_month_complete:
-            if labels and labels[-1] == current_label:
-                totals[-1] = current_total
-            else:
-                labels.append(current_label)
-                totals.append(current_total)
-        else:
-            if labels and labels[-1] != current_label:
-                labels.append(current_label)
-                totals.append(current_total)
-
+        
     monthly_changes = []
-    for index, total in enumerate(totals):
+    today = date.today()
+    current_year = today.year
+    all_investments = Investment.query.order_by(Investment.investment_date).all()
+    
+    for index, record in enumerate(growth_records):
+        total = record.total
         if index == 0:
-            monthly_changes.append(total)
+            if record.year == current_year and record.month == 1:
+                last_year_end = date(current_year - 1, 12, 31)
+                prior_year_total = sum(inv.amount for inv in all_investments if inv.investment_date <= last_year_end)
+                monthly_changes.append(round(total - prior_year_total, 2))
+            else:
+                monthly_changes.append(total)
         else:
             monthly_changes.append(round(total - totals[index - 1], 2))
-
-    investments = Investment.query.order_by(Investment.investment_date).all()
-    category_data = {}
-    for inv in investments:
-        cat_name = inv.finance.name
-        if cat_name not in category_data:
-            category_data[cat_name] = defaultdict(float)
-        key = inv.investment_date.strftime("%Y-%m")
-        category_data[cat_name][key] += inv.amount
-
+            
+    # Calculate category breakdowns for each month in labels
     category_series = {}
-    if growth_records:
-        # Use the ordered growth labels when mapping category series for display.
-        month_keys = [datetime.strptime(label, "%Y %b").strftime("%Y-%m") for label in labels]
-    else:
-        month_keys = []
-
-    for cat_name, monthly in category_data.items():
+    finances = Finance.query.all()
+    
+    for f in finances:
         series = []
-        running = 0
-        for month_key in month_keys:
-            running += monthly.get(month_key, 0)
-            series.append(round(running, 2))
-        category_series[cat_name] = series
-
+        for record in growth_records:
+            last_day = date(record.year, record.month, monthrange(record.year, record.month)[1])
+            total_for_cat_and_month = sum(inv.amount for inv in all_investments if inv.finance_id == f.id and inv.investment_date <= last_day)
+            series.append(round(total_for_cat_and_month, 2))
+        category_series[f.name] = series
+        
     return {
         "labels": labels,
         "cumulative": totals,
@@ -223,7 +232,7 @@ def add_investment():
         db.session.add(investment)
         db.session.commit()
 
-    return redirect("/")
+    return redirect(request.referrer or "/")
 
 
 @app.route("/update_investment", methods=["POST"])
@@ -250,7 +259,7 @@ def update_investment():
                 
         db.session.commit()
 
-    return redirect("/")
+    return redirect(request.referrer or "/")
 
 
 @app.route("/delete_investment/<int:id>")
@@ -260,7 +269,7 @@ def delete_investment(id):
         db.session.delete(investment)
         db.session.commit()
 
-    return redirect("/")
+    return redirect(request.referrer or "/")
 
 
 if __name__ == "__main__":
