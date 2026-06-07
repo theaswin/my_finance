@@ -18,6 +18,11 @@ class Finance(db.Model):
         db.String(500)
     )
 
+    status = db.Column(
+        db.String(20),
+        default='growing'
+    )
+
     investments = db.relationship(
         "Investment",
         backref="finance",

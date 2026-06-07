@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, jsonify
 from datetime import datetime, date
 from calendar import monthrange
-from sqlalchemy import func, extract
+from sqlalchemy import func, extract, text
 from collections import defaultdict
 from models import db, Finance, Investment, PortfolioGrowth
 
@@ -11,6 +11,18 @@ app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///finance.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
+
+
+def ensure_finance_status_column():
+    """Add the finance.status column if it does not exist in the SQLite schema."""
+    engine = db.engine
+    if engine.dialect.name == 'sqlite':
+        with engine.connect() as conn:
+            result = conn.execute(text("PRAGMA table_info(finance)"))
+            existing_columns = {row[1] for row in result}
+            if 'status' not in existing_columns:
+                conn.execute(text("ALTER TABLE finance ADD COLUMN status VARCHAR(20) DEFAULT 'growing'"))
+                conn.commit()
 
 
 def sync_portfolio_growth():
@@ -52,32 +64,22 @@ def get_monthly_chart_data(current_net_worth=None):
     
     growth_records = PortfolioGrowth.query.order_by(PortfolioGrowth.year, PortfolioGrowth.month).all()
     
-    labels = []
-    totals = []
-    for record in growth_records:
-        labels.append(record.date)
-        totals.append(round(record.total, 2))
-        
-    monthly_changes = []
-    today = date.today()
-    current_year = today.year
-    all_investments = Investment.query.order_by(Investment.investment_date).all()
+    month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    labels = [f"{record.year} {month_names[record.month - 1]}" for record in growth_records]
+    totals = [round(record.total, 2) for record in growth_records]
     
+    monthly_changes = []
     for index, record in enumerate(growth_records):
         total = record.total
         if index == 0:
-            if record.year == current_year and record.month == 1:
-                last_year_end = date(current_year - 1, 12, 31)
-                prior_year_total = sum(inv.amount for inv in all_investments if inv.investment_date <= last_year_end)
-                monthly_changes.append(round(total - prior_year_total, 2))
-            else:
-                monthly_changes.append(total)
+            monthly_changes.append(total)
         else:
             monthly_changes.append(round(total - totals[index - 1], 2))
             
     # Calculate category breakdowns for each month in labels
     category_series = {}
     finances = Finance.query.all()
+    all_investments = Investment.query.order_by(Investment.investment_date).all()
     
     for f in finances:
         series = []
@@ -103,10 +105,17 @@ def home():
     total_balance = 0
     total_investments_count = 0
     
+    today = date.today()
+    prev_month = today.month - 1 or 12
+    prev_year = today.year if today.month != 1 else today.year - 1
+    prev_month_last_day = date(prev_year, prev_month, monthrange(prev_year, prev_month)[1])
+
     for f in finances:
         category_total = sum(inv.amount for inv in f.investments)
-        # Store temporary sum on the object for easy rendering in jinja template
+        previous_total = sum(inv.amount for inv in f.investments if inv.investment_date <= prev_month_last_day)
+        derived_status = 'growing' if category_total > previous_total else 'hold'
         f.total_amount = category_total
+        f.status = getattr(f, 'status', None) or derived_status
         total_balance += category_total
         total_investments_count += len(f.investments)
     
@@ -170,7 +179,8 @@ def add_finance():
     logo = custom_logo if custom_logo else request.form.get("logo", "wallet").strip()
     
     if name:
-        finance = Finance(name=name, logo=logo)
+        status = request.form.get('status', 'growing')
+        finance = Finance(name=name, logo=logo, status=status)
         db.session.add(finance)
         db.session.commit()
 
@@ -184,10 +194,12 @@ def edit_finance(id):
         name = request.form.get("name", "").strip()
         custom_logo = request.form.get("custom_logo", "").strip()
         logo = custom_logo if custom_logo else request.form.get("logo", "wallet").strip()
+        status = request.form.get("status", "growing").strip()
         
         if name:
             finance.name = name
             finance.logo = logo
+            finance.status = status
             db.session.commit()
             
     return redirect("/")
@@ -275,5 +287,6 @@ def delete_investment(id):
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
+        ensure_finance_status_column()
 
     app.run(debug=True)

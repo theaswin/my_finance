@@ -96,8 +96,12 @@
                                 <span class="badge">{{ finance.investments|length }} items</span>
                             </div>
                         </div>
+                        <div class="status-widget {{ 'status-growing' if finance.status == 'growing' else 'status-hold' }}">
+                            <i data-lucide="{{ 'trending-up' if finance.status == 'growing' else 'trending-down' }}" class="status-bulb"></i>
+                            <span>{{ 'Growing' if finance.status == 'growing' else 'Hold' }}</span>
+                        </div>
                         <div class="card-actions">
-                            <button class="btn-icon" onclick="event.stopPropagation(); openEditCategoryModal('{{ finance.id }}', '{{ finance.name | escape }}', '{{ finance.logo | escape }}')" title="Edit Category">
+                            <button class="btn-icon" onclick="event.stopPropagation(); openEditCategoryModal('{{ finance.id }}', '{{ finance.name | escape }}', '{{ finance.logo | escape }}', '{{ finance.status or 'growing' }}')" title="Edit Category">
                                 <i data-lucide="edit-3"></i>
                             </button>
                             <button class="btn-icon" onclick="event.stopPropagation(); toggleAddForm('add-form-{{ finance.id }}')" title="Add Investment">
@@ -313,6 +317,14 @@
                     </div>
                     
                     <div class="form-group">
+                        <label for="edit-cat-status">Portfolio Status</label>
+                        <select id="edit-cat-status" name="status">
+                            <option value="growing">Growing</option>
+                            <option value="hold">Hold</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
                         <label>Select Icon Representation</label>
                         <div class="icon-selector-grid">
                             <label class="icon-option">
@@ -444,9 +456,10 @@
         }
 
         // Edit Category Modal Prep
-        function openEditCategoryModal(id, name, logo) {
+        function openEditCategoryModal(id, name, logo, status) {
             document.getElementById('edit-category-form').action = '/edit_finance/' + id;
             document.getElementById('edit-cat-name').value = name;
+            document.getElementById('edit-cat-status').value = status || 'growing';
             
             const isUrl = logo.startsWith('http') || logo.includes('/') || logo.includes('.');
             if (isUrl) {
