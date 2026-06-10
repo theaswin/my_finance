@@ -80,7 +80,7 @@
         <!-- Categories & Investments Grid -->
         <main class="finance-grid">
             {% for finance in finances %}
-                <div class="finance-card glass-card clickable" onclick="redirectToHistory({{ finance.id }})">
+                <div id="finance-{{ finance.id }}" class="finance-card glass-card clickable" onclick="window.location.href='/category/{{ finance.id }}'">
                     <!-- Card Header -->
                     <div class="card-header">
                         <div class="category-meta">
@@ -93,7 +93,7 @@
                             </div>
                             <div>
                                 <h3>{{ finance.name }}</h3>
-                                <span class="badge">{{ finance.investments|length }} items</span>
+                                <span class="badge">{{ finance.sub_categories|length }} subcategories</span>
                             </div>
                         </div>
                         <div class="status-widget {{ 'status-growing' if finance.status == 'growing' else 'status-hold' }}">
@@ -121,64 +121,96 @@
                             <div class="balance-value">₹{{ "{:,.2f}".format(finance.total_amount) }}</div>
                         </div>
 
-                        <!-- Collapsible Form: Add Investment -->
-                        <div id="add-form-{{ finance.id }}" class="collapsible-form-container">
-                            <form method="POST" action="/add_investment" class="compact-form">
-                                <input type="hidden" name="finance_id" value="{{ finance.id }}">
-                                
-                                <div class="form-group">
-                                    <input type="text" name="description" placeholder="Description (e.g., Apple stock, Savings)" required>
-                                </div>
-                                
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <input type="number" step="0.01" name="amount" placeholder="Amount (₹)" required>
+                        <div id="finance-expanded-{{ finance.id }}" class="finance-expanded-content collapsible-form-container">
+                            <div class="subcategory-panel">
+                                <div class="section-label">Subcategories</div>
+                                {% if finance.sub_categories %}
+                                    <div class="subcategory-list">
+                                        {% for sub in finance.sub_categories %}
+                                            <div class="subcategory-item" data-subcategory-id="{{ sub.id }}" onclick="event.stopPropagation(); window.location.href='/category/{{ finance.id }}/subcategory/{{ sub.id }}'">
+                                                <span>{{ sub.name }}</span>
+                                                <span class="badge">{{ sub.payments|length }}</span>
+                                            </div>
+                                        {% endfor %}
                                     </div>
-                                    <div class="form-group">
-                                        <input type="date" name="investment_date" value="{{ today_date }}" required>
+                                {% else %}
+                                    <div class="empty-state">
+                                        <i data-lucide="folder"></i>
+                                        <p>No subcategories yet. Open the category to add one.</p>
                                     </div>
-                                </div>
-                                
-                                <div class="form-actions">
-                                    <button type="submit" class="btn btn-success btn-sm w-full">Save Investment</button>
-                                </div>
-                            </form>
-                        </div>
+                                {% endif %}
+                            </div>
 
-                        <!-- Investments List -->
-                        <div class="investments-list">
-                            {% if finance.investments %}
-                                <div class="list-header">
-                                    <span>Details</span>
-                                    <span class="text-right">Amount</span>
-                                </div>
-                                <div class="list-scrollable">
-                                    {% for inv in finance.investments | sort(attribute='investment_date', reverse=True) %}
-                                        <div class="investment-row">
-                                            <div class="inv-details">
-                                                <span class="inv-desc">{{ inv.description }}</span>
-                                                <span class="inv-date">{{ inv.investment_date.strftime('%b %d, %Y') }}</span>
+                            <div class="subcategory-investments-area">
+                                {% for sub in finance.sub_categories %}
+                                    <div id="subcat-investments-{{ finance.id }}-{{ sub.id }}" class="subcat-investments-list hidden">
+                                        {% if sub.payments %}
+                                            <div class="list-header">
+                                                <span>Details</span>
+                                                <span class="text-right">Amount</span>
                                             </div>
-                                            <div class="inv-actions-amount">
-                                                <span class="inv-amount">₹{{ "{:,.2f}".format(inv.amount) }}</span>
-                                                <div class="inv-hover-actions">
-                                                    <button class="btn-action-icon edit" onclick="event.stopPropagation(); openEditModal('{{ inv.id }}', '{{ inv.amount }}', '{{ inv.description }}', '{{ inv.investment_date }}')">
-                                                        <i data-lucide="edit-3"></i>
-                                                    </button>
-                                                    <a href="/delete_investment/{{ inv.id }}" class="btn-action-icon delete" onclick="event.stopPropagation(); return confirm('Delete this investment?')">
-                                                        <i data-lucide="x"></i>
-                                                    </a>
-                                                </div>
+                                            <div class="list-scrollable">
+                                                {% for inv in sub.payments | sort(attribute='investment_date', reverse=True) %}
+                                                    <div class="investment-row">
+                                                        <div class="inv-details">
+                                                            <span class="inv-desc">{{ inv.description }}</span>
+                                                            <span class="inv-date">{{ inv.investment_date.strftime('%b %d, %Y') }}</span>
+                                                        </div>
+                                                        <div class="inv-actions-amount">
+                                                            <span class="inv-amount">₹{{ "{:,.2f}".format(inv.amount) }}</span>
+                                                            <div class="inv-hover-actions">
+                                                                <a href="/delete_investment/{{ inv.id }}" class="btn-action-icon delete" onclick="event.stopPropagation(); return confirm('Delete this investment?')">
+                                                                    <i data-lucide="x"></i>
+                                                                </a>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                {% endfor %}
                                             </div>
+                                        {% else %}
+                                            <div class="empty-state">
+                                                <i data-lucide="inbox"></i>
+                                                <p>No investments in this subcategory yet.</p>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+
+                            <div id="add-form-{{ finance.id }}" class="collapsible-form-container">
+                                {% if finance.sub_categories %}
+                                <form method="POST" action="/add_investment" class="compact-form">
+                                    <input type="hidden" name="finance_id" value="{{ finance.id }}">
+                                    <div class="form-group">
+                                        <label for="finance-add-subcat-{{ finance.id }}">Subcategory</label>
+                                        <select id="finance-add-subcat-{{ finance.id }}" name="subcategory_id" required>
+                                            {% for sub in finance.sub_categories %}
+                                                <option value="{{ sub.id }}">{{ sub.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <input type="text" name="description" placeholder="Description (e.g., Apple stock, Savings)" required>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <input type="number" step="0.01" name="amount" placeholder="Amount (₹)" required>
                                         </div>
-                                    {% endfor %}
-                                </div>
-                            {% else %}
+                                        <div class="form-group">
+                                            <input type="date" name="investment_date" value="{{ today_date }}" required>
+                                        </div>
+                                    </div>
+                                    <div class="form-actions">
+                                        <button type="submit" class="btn btn-success btn-sm w-full">Save Investment</button>
+                                    </div>
+                                </form>
+                                {% else %}
                                 <div class="empty-state">
-                                    <i data-lucide="inbox"></i>
-                                    <p>No investments logged. Add one above!</p>
+                                    <i data-lucide="alert-circle"></i>
+                                    <p>Create a subcategory first to add investments.</p>
                                 </div>
-                            {% endif %}
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -389,7 +421,10 @@
                         <label for="edit-inv-desc">Description</label>
                         <input type="text" id="edit-inv-desc" name="description" required>
                     </div>
-                    
+                    <div class="form-group">
+                        <label for="edit-inv-subcategory">Subcategory</label>
+                        <select id="edit-inv-subcategory" name="subcategory_id" required></select>
+                    </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label for="edit-inv-amount">Amount (₹)</label>
@@ -434,6 +469,37 @@
             }
         }
 
+        function toggleFinancePanel(panelId) {
+            const panel = document.getElementById(panelId);
+            if (panel) {
+                panel.classList.toggle('active');
+            }
+        }
+
+        function openSubcategoryInvestments(event, financeId, subcategoryId) {
+            event.stopPropagation();
+            const financeCard = document.getElementById('finance-' + financeId);
+            if (!financeCard) return;
+
+            financeCard.querySelectorAll('.subcategory-item').forEach(item => {
+                item.classList.toggle('active', item.dataset.subcategoryId === String(subcategoryId));
+            });
+
+            financeCard.querySelectorAll('.subcat-investments-list').forEach(section => {
+                section.classList.add('hidden');
+            });
+
+            const selectedSection = document.getElementById(`subcat-investments-${financeId}-${subcategoryId}`);
+            if (selectedSection) {
+                selectedSection.classList.remove('hidden');
+            }
+
+            const panel = document.getElementById('finance-expanded-' + financeId);
+            if (panel && !panel.classList.contains('active')) {
+                panel.classList.add('active');
+            }
+        }
+
         // Modal Controls
         function openModal(modalId) {
             document.getElementById(modalId).classList.add('active');
@@ -443,18 +509,50 @@
             document.getElementById(modalId).classList.remove('active');
         }
 
+        // Investment subcategory lookup data for the edit modal
+        const financeSubcategories = {
+            {% for finance in finances %}
+                {{ finance.id }}: [
+                    {% for sub in finance.sub_categories %}
+                        { id: {{ sub.id }}, name: {{ sub.name | tojson }} }{% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                ]{% if not loop.last %}, {% endif %}
+            {% endfor %}
+        };
+
         // Edit Investment Modal Prep
-        function openEditModal(id, amount, description, dateString) {
+        function openEditModal(id, amount, description, dateString, financeId, subcategoryId) {
             document.getElementById('edit-inv-id').value = id;
             document.getElementById('edit-inv-amount').value = parseFloat(amount);
             document.getElementById('edit-inv-desc').value = description;
-            
-            // Handle date conversion if needed
+
+            const subcategorySelect = document.getElementById('edit-inv-subcategory');
+            subcategorySelect.innerHTML = '';
+            const options = financeSubcategories[financeId] || [];
+            options.forEach(optionData => {
+                const opt = document.createElement('option');
+                opt.value = optionData.id;
+                opt.text = optionData.name;
+                subcategorySelect.appendChild(opt);
+            });
+
+            if (options.length > 0) {
+                if (subcategoryId !== null && options.some(opt => String(opt.id) === String(subcategoryId))) {
+                    subcategorySelect.value = subcategoryId;
+                } else {
+                    subcategorySelect.value = options[0].id;
+                }
+            } else {
+                const opt = document.createElement('option');
+                opt.text = 'No subcategory available';
+                opt.disabled = true;
+                opt.selected = true;
+                subcategorySelect.appendChild(opt);
+            }
+
             document.getElementById('edit-inv-date').value = dateString;
-            
             openModal('edit-investment-modal');
         }
-
         // Edit Category Modal Prep
         function openEditCategoryModal(id, name, logo, status) {
             document.getElementById('edit-category-form').action = '/edit_finance/' + id;

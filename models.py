@@ -23,9 +23,49 @@ class Finance(db.Model):
         default='growing'
     )
 
+    sub_categories = db.relationship(
+        "SubCategory",
+        back_populates="finance",
+        lazy=True,
+        cascade="all, delete-orphan"
+    )
+
     investments = db.relationship(
         "Investment",
-        backref="finance",
+        back_populates="finance",
+        lazy=True,
+        cascade="all, delete-orphan"
+    )
+
+
+class SubCategory(db.Model):
+    __tablename__ = "sub_category"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    name = db.Column(
+        db.String(100),
+        nullable=False
+    )
+
+    icon = db.Column(
+        db.String(500)
+    )
+
+    finance_id = db.Column(
+        db.Integer,
+        db.ForeignKey("finance.id"),
+        nullable=False
+    )
+
+    finance = db.relationship(
+        "Finance",
+        back_populates="sub_categories"
+    )
+
+    payments = db.relationship(
+        "Investment",
+        back_populates="subcategory",
         lazy=True,
         cascade="all, delete-orphan"
     )
@@ -57,6 +97,22 @@ class Investment(db.Model):
         db.Integer,
         db.ForeignKey("finance.id"),
         nullable=False
+    )
+
+    subcategory_id = db.Column(
+        db.Integer,
+        db.ForeignKey("sub_category.id"),
+        nullable=False
+    )
+
+    finance = db.relationship(
+        "Finance",
+        back_populates="investments"
+    )
+
+    subcategory = db.relationship(
+        "SubCategory",
+        back_populates="payments"
     )
 
 

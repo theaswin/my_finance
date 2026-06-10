@@ -3,7 +3,7 @@ from datetime import datetime, date
 from calendar import monthrange
 from sqlalchemy import func, extract, text
 from collections import defaultdict
-from models import db, Finance, Investment, PortfolioGrowth
+from models import db, Finance, Investment, PortfolioGrowth, SubCategory
 
 app = Flask(__name__)
 
@@ -23,6 +23,57 @@ def ensure_finance_status_column():
             if 'status' not in existing_columns:
                 conn.execute(text("ALTER TABLE finance ADD COLUMN status VARCHAR(20) DEFAULT 'growing'"))
                 conn.commit()
+
+
+def ensure_subcategory_schema():
+    """Ensure subcategory schema exists and migrate existing investments into a default subcategory."""
+    engine = db.engine
+    if engine.dialect.name == 'sqlite':
+        with engine.connect() as conn:
+            result = conn.execute(text("PRAGMA table_info(investment)"))
+            existing_columns = {row[1] for row in result}
+            if 'subcategory_id' not in existing_columns:
+                conn.execute(text("ALTER TABLE investment ADD COLUMN subcategory_id INTEGER"))
+                conn.commit()
+
+            subcat_columns = conn.execute(text("PRAGMA table_info(sub_category)")).fetchall()
+            subcat_existing_columns = {row[1] for row in subcat_columns}
+            if 'icon' not in subcat_existing_columns:
+                conn.execute(text("ALTER TABLE sub_category ADD COLUMN icon VARCHAR(500)"))
+                conn.commit()
+
+            # Ensure every finance has a default subcategory
+            existing_finances = conn.execute(text("SELECT id FROM finance")).fetchall()
+            for row in existing_finances:
+                finance_id = row[0]
+                subcat_exists = conn.execute(
+                    text("SELECT 1 FROM sub_category WHERE finance_id = :fid LIMIT 1"),
+                    {"fid": finance_id}
+                ).fetchone()
+                if not subcat_exists:
+                    conn.execute(
+                        text("INSERT INTO sub_category (name, finance_id) VALUES (:name, :fid)"),
+                        {"name": "General", "fid": finance_id}
+                    )
+                    conn.commit()
+
+            default_subcategories = conn.execute(text(
+                "SELECT sub_category.id, sub_category.finance_id FROM sub_category"
+            )).fetchall()
+            default_by_finance = {row[1]: row[0] for row in default_subcategories}
+
+            investments_to_update = conn.execute(
+                text("SELECT id, finance_id FROM investment WHERE subcategory_id IS NULL")
+            ).fetchall()
+            for row in investments_to_update:
+                inv_id, finance_id = row
+                subcat_id = default_by_finance.get(finance_id)
+                if subcat_id is not None:
+                    conn.execute(
+                        text("UPDATE investment SET subcategory_id = :scid WHERE id = :iid"),
+                        {"scid": subcat_id, "iid": inv_id}
+                    )
+            conn.commit()
 
 
 def sync_portfolio_growth():
@@ -133,11 +184,10 @@ def home():
     )
 
 
-@app.route("/history")
-@app.route("/history/<int:finance_id>")
-def payment_history(finance_id=None):
+def load_finance_context(finance_id=None, subcategory_id=None):
     finances = Finance.query.order_by(Finance.name).all()
     selected_finance = None
+    selected_subcategory = None
 
     if finance_id is not None:
         selected_finance = db.session.get(Finance, finance_id)
@@ -145,25 +195,78 @@ def payment_history(finance_id=None):
         selected_finance = finances[0]
 
     if selected_finance is None and finances:
-        return redirect(f"/history/{finances[0].id}")
+        return None, None, None, None, None, finances
 
+    subcategories = []
     investments = []
     total_amount = 0.0
+
     if selected_finance:
-        investments = sorted(
-            selected_finance.investments,
-            key=lambda inv: inv.investment_date,
-            reverse=True,
-        )
-        total_amount = sum(inv.amount for inv in investments)
+        subcategories = selected_finance.sub_categories
+        if subcategory_id is not None:
+            selected_subcategory = SubCategory.query.filter_by(
+                id=subcategory_id,
+                finance_id=selected_finance.id
+            ).first()
+
+        if subcategory_id is None:
+            investments = []
+            total_amount = sum(inv.amount for sub in subcategories for inv in sub.payments)
+        elif selected_subcategory:
+            investments = sorted(
+                selected_subcategory.payments,
+                key=lambda inv: inv.investment_date,
+                reverse=True,
+            )
+            total_amount = sum(inv.amount for inv in investments)
+
+    return finances, selected_finance, subcategories, selected_subcategory, investments, total_amount
+
+
+@app.route("/history")
+@app.route("/history/<int:finance_id>")
+@app.route("/history/<int:finance_id>/<int:subcategory_id>")
+def payment_history(finance_id=None, subcategory_id=None):
+    finances, selected_finance, subcategories, selected_subcategory, investments, total_amount = load_finance_context(finance_id, subcategory_id)
+
+    if selected_finance is None and finances:
+        return redirect(f"/history/{finances[0].id}")
 
     return render_template(
         "history.html",
         finances=finances,
         selected_finance=selected_finance,
+        subcategories=subcategories,
+        selected_subcategory=selected_subcategory,
         investments=investments,
         total_amount=total_amount,
     )
+
+
+@app.route("/category/<int:finance_id>")
+@app.route("/category/<int:finance_id>/subcategory/<int:subcategory_id>")
+def category_page(finance_id, subcategory_id=None):
+    finances, selected_finance, subcategories, selected_subcategory, investments, total_amount = load_finance_context(finance_id, subcategory_id)
+    if selected_finance is None and finances:
+        return redirect(f"/category/{finances[0].id}")
+
+    return render_template(
+        "category.html",
+        finances=finances,
+        selected_finance=selected_finance,
+        subcategories=subcategories,
+        selected_subcategory=selected_subcategory,
+        investments=investments,
+        total_amount=total_amount,
+    )
+
+
+@app.route("/category")
+def category_redirect():
+    finances = Finance.query.order_by(Finance.name).all()
+    if finances:
+        return redirect(f"/category/{finances[0].id}")
+    return redirect("/")
 
 
 @app.route("/api/chart_data")
@@ -185,6 +288,22 @@ def add_finance():
         db.session.commit()
 
     return redirect("/")
+
+
+@app.route("/add_subcategory", methods=["POST"])
+def add_subcategory():
+    finance_id = request.form.get("finance_id")
+    name = request.form.get("name", "").strip()
+    icon = request.form.get("icon", "").strip()
+
+    if finance_id and name:
+        finance = db.session.get(Finance, finance_id)
+        if finance:
+            subcategory = SubCategory(name=name, finance_id=finance.id, icon=icon or None)
+            db.session.add(subcategory)
+            db.session.commit()
+
+    return redirect(request.referrer or "/")
 
 
 @app.route("/edit_finance/<int:id>", methods=["POST"])
@@ -216,7 +335,7 @@ def delete_finance(id):
 
 @app.route("/add_investment", methods=["POST"])
 def add_investment():
-    finance_id = request.form.get("finance_id")
+    subcategory_id = request.form.get("subcategory_id")
     amount_str = request.form.get("amount", "0")
     description = request.form.get("description", "").strip()
     date_str = request.form.get("investment_date", "").strip()
@@ -234,15 +353,18 @@ def add_investment():
     else:
         investment_date = date.today()
 
-    if finance_id:
-        investment = Investment(
-            finance_id=finance_id,
-            amount=amount,
-            description=description,
-            investment_date=investment_date
-        )
-        db.session.add(investment)
-        db.session.commit()
+    if subcategory_id:
+        subcategory = db.session.get(SubCategory, subcategory_id)
+        if subcategory:
+            investment = Investment(
+                finance_id=subcategory.finance_id,
+                subcategory_id=subcategory.id,
+                amount=amount,
+                description=description,
+                investment_date=investment_date
+            )
+            db.session.add(investment)
+            db.session.commit()
 
     return redirect(request.referrer or "/")
 
@@ -262,13 +384,20 @@ def update_investment():
             pass
             
         investment.description = description
-        
+
+        subcategory_id = request.form.get("subcategory_id")
+        if subcategory_id:
+            subcategory = db.session.get(SubCategory, subcategory_id)
+            if subcategory:
+                investment.subcategory_id = subcategory.id
+                investment.finance_id = subcategory.finance_id
+
         if date_str:
             try:
                 investment.investment_date = datetime.strptime(date_str, "%Y-%m-%d").date()
             except ValueError:
                 pass
-                
+
         db.session.commit()
 
     return redirect(request.referrer or "/")
@@ -288,5 +417,6 @@ if __name__ == "__main__":
     with app.app_context():
         db.create_all()
         ensure_finance_status_column()
+        ensure_subcategory_schema()
 
     app.run(debug=True)

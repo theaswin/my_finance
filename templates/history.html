@@ -37,7 +37,22 @@
                         <span class="badge">{{ investments|length }} payments total</span>
                     </div>
                 </div>
-                
+
+                {% if subcategories %}
+                <div class="subcategory-tabs">
+                    <a href="/history/{{ selected_finance.id }}" class="subcategory-tab{% if not selected_subcategory %} active{% endif %}">All Payments</a>
+                    {% for sub in subcategories %}
+                        <a href="/history/{{ selected_finance.id }}/{{ sub.id }}" class="subcategory-tab{% if selected_subcategory and selected_subcategory.id == sub.id %} active{% endif %}">{{ sub.name }}</a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state subcategory-empty-state">
+                    <i data-lucide="folder"></i>
+                    <h3>No subcategory yet</h3>
+                    <p>Add a subcategory below to start tracking payments.</p>
+                </div>
+                {% endif %}
+
                 <div class="header-right">
                     <div class="metric-block">
                         <span class="metric-label">Total Allocated</span>
@@ -46,13 +61,14 @@
                 </div>
             </header>
 
-            <!-- Quick Add Transaction Card (Inline / Glass) -->
+            {% if selected_subcategory %}
             <section class="quick-add-section glass-card">
                 <div class="section-header">
                     <h3><i data-lucide="plus-circle" class="text-primary"></i> Add New Payment</h3>
                 </div>
                 <form method="POST" action="/add_investment" class="quick-add-form">
                     <input type="hidden" name="finance_id" value="{{ selected_finance.id }}">
+                    <input type="hidden" name="subcategory_id" value="{{ selected_subcategory.id }}">
                     <div class="form-row">
                         <div class="form-group flex-2">
                             <label>Description</label>
@@ -74,26 +90,114 @@
                     </div>
                 </form>
             </section>
+            {% else %}
+            <section class="subcategory-cards-grid glass-card">
+                <div class="section-header">
+                    <h3><i data-lucide="layers" class="text-primary"></i> Select a Subcategory</h3>
+                    <p class="text-muted">Click a subcategory block to view its investments.</p>
+                </div>
+                {% if subcategories %}
+                <div class="subcategory-cards">
+                    {% for sub in subcategories %}
+                        <a href="/history/{{ selected_finance.id }}/{{ sub.id }}" class="subcategory-card">
+                            <div class="subcategory-card-icon">
+                                {% if sub.icon %}
+                                    {% if sub.icon.startswith('http') or '/' in sub.icon or '.' in sub.icon %}
+                                        <img src="{{ sub.icon }}" alt="{{ sub.name }} icon">
+                                    {% else %}
+                                        <i data-lucide="{{ sub.icon }}"></i>
+                                    {% endif %}
+                                {% else %}
+                                    <i data-lucide="layers"></i>
+                                {% endif %}
+                            </div>
+                            <div class="subcategory-card-title">{{ sub.name }}</div>
+                            <div class="subcategory-card-total">₹{{ "{:,.2f}".format(sub.payments|sum(attribute='amount')) }} total</div>
+                            <div class="subcategory-card-meta">
+                                <span>{{ sub.payments|length }} payments</span>
+                            </div>
+                        </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <i data-lucide="alert-circle"></i>
+                    <h3>No subcategories exist</h3>
+                    <p>Create a subcategory first to open investment history.</p>
+                </div>
+                {% endif %}
+            </section>
+            {% endif %}
 
+            <section class="subcategory-setup-card glass-card">
+                <div class="section-header">
+                    <h3><i data-lucide="layers" class="text-primary"></i> Subcategory Management</h3>
+                    <p class="text-muted">Keep payments organized by subcategory within this category.</p>
+                </div>
+                <form method="POST" action="/add_subcategory" class="quick-add-form">
+                    <input type="hidden" name="finance_id" value="{{ selected_finance.id }}">
+                    <div class="form-row">
+                        <div class="form-group flex-2">
+                            <label>Subcategory Name</label>
+                            <input type="text" name="name" placeholder="e.g. Monthly Budget, Investments" required>
+                        </div>
+                        <div class="form-group flex-2">
+                            <label>Icon URL or Name</label>
+                            <input type="text" name="icon" placeholder="https://... or lucide icon name">
+                        </div>
+                        <div class="form-group btn-group-align">
+                            <button type="submit" class="btn btn-primary w-full">
+                                <i data-lucide="plus"></i> Add Subcategory
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </section>
+
+            {% if selected_subcategory %}
             <!-- Read-Only Payment History Table Card -->
             <section class="history-content-card glass-card">
                 <div class="section-header">
                     <h3><i data-lucide="clock" class="text-warning"></i> Payment History</h3>
-                    <p class="text-muted">Chronological view of all investments in this category</p>
+                    <p class="text-muted">Chronological view of investments in this subcategory</p>
                 </div>
                 
                 {% if investments %}
                     <div class="history-table">
                         <div class="history-table-row history-table-header">
+                            <span>Subcategory</span>
                             <span>Description</span>
                             <span>Date</span>
                             <span class="text-right">Amount</span>
+                            <span class="text-right">Actions</span>
                         </div>
                         {% for inv in investments %}
                             <div class="history-table-row">
+                                <span>
+                                    {% if subcategories %}
+                                        <form method="POST" action="/update_investment" class="subcategory-select-form">
+                                            <input type="hidden" name="investment_id" value="{{ inv.id }}">
+                                            <input type="hidden" name="description" value="{{ inv.description or '' }}">
+                                            <input type="hidden" name="amount" value="{{ inv.amount }}">
+                                            <input type="hidden" name="investment_date" value="{{ inv.investment_date }}">
+                                            <select name="subcategory_id" onchange="this.form.submit()">
+                                                {% for sub in subcategories %}
+                                                    <option value="{{ sub.id }}"{% if inv.subcategory_id == sub.id %} selected{% endif %}>{{ sub.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </form>
+                                    {% else %}
+                                        {{ inv.subcategory.name if inv.subcategory else 'Unassigned' }}
+                                    {% endif %}
+                                </span>
                                 <span class="inv-description-text">{{ inv.description or 'No description' }}</span>
                                 <span class="inv-date-text">{{ inv.investment_date.strftime('%b %d, %Y') }}</span>
                                 <span class="history-amount">₹{{ "{:,.2f}".format(inv.amount) }}</span>
+                                <span class="history-actions">
+                                    <a href="/delete_investment/{{ inv.id }}" class="btn-action-icon delete" onclick="return confirm('Delete this payment?')">
+                                        <i data-lucide="x"></i>
+                                    </a>
+                                </span>
                             </div>
                         {% endfor %}
                     </div>
@@ -119,6 +223,127 @@
         {% endif %}
     </div>
 
+    <!-- Modal: Edit Category -->
+    <div id="edit-category-modal" class="modal-overlay">
+        <div class="modal-container glass-card">
+            <div class="modal-header">
+                <h2>Edit Portfolio Category</h2>
+                <button class="btn-close" onclick="closeModal('edit-category-modal')">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <form id="edit-category-form" method="POST" action="">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="edit-cat-name">Category Name</label>
+                        <input type="text" id="edit-cat-name" name="name" placeholder="e.g. Stocks, Crypto, Real Estate" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="edit-cat-custom-logo">Custom Icon Image URL (Optional)</label>
+                        <input type="text" id="edit-cat-custom-logo" name="custom_logo" placeholder="https://example.com/logo.png (Overrides preset icon below)">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="edit-cat-status">Portfolio Status</label>
+                        <select id="edit-cat-status" name="status">
+                            <option value="growing">Growing</option>
+                            <option value="hold">Hold</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Select Icon Representation</label>
+                        <div class="icon-selector-grid">
+                            <label class="icon-option">
+                                <input type="radio" name="logo" id="edit-logo-trending-up" value="trending-up">
+                                <span class="icon-box"><i data-lucide="trending-up"></i></span>
+                                <span class="icon-label">Stocks</span>
+                            </label>
+                            
+                            <label class="icon-option">
+                                <input type="radio" name="logo" id="edit-logo-coins" value="coins">
+                                <span class="icon-box"><i data-lucide="coins"></i></span>
+                                <span class="icon-label">Crypto</span>
+                            </label>
+
+                            <label class="icon-option">
+                                <input type="radio" name="logo" id="edit-logo-piggy-bank" value="piggy-bank">
+                                <span class="icon-box"><i data-lucide="piggy-bank"></i></span>
+                                <span class="icon-label">Savings</span>
+                            </label>
+
+                            <label class="icon-option">
+                                <input type="radio" name="logo" id="edit-logo-home" value="home">
+                                <span class="icon-box"><i data-lucide="home"></i></span>
+                                <span class="icon-label">Property</span>
+                            </label>
+
+                            <label class="icon-option">
+                                <input type="radio" name="logo" id="edit-logo-landmark" value="landmark">
+                                <span class="icon-box"><i data-lucide="landmark"></i></span>
+                                <span class="icon-label">Bank</span>
+                            </label>
+
+                            <label class="icon-option">
+                                <input type="radio" name="logo" id="edit-logo-wallet" value="wallet">
+                                <span class="icon-box"><i data-lucide="wallet"></i></span>
+                                <span class="icon-label">Other</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('edit-category-modal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Edit Payment -->
+    <div id="edit-payment-modal" class="modal-overlay">
+        <div class="modal-container glass-card">
+            <div class="modal-header">
+                <h2>Edit Payment</h2>
+                <button class="btn-close" onclick="closeModal('edit-payment-modal')">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <form id="edit-payment-form" method="POST" action="/update_investment">
+                <input type="hidden" id="edit-payment-id" name="investment_id">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="edit-payment-description">Description</label>
+                        <input type="text" id="edit-payment-description" name="description" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-payment-subcategory">Subcategory</label>
+                        <select id="edit-payment-subcategory" name="subcategory_id" required>
+                            {% for sub in subcategories %}
+                                <option value="{{ sub.id }}">{{ sub.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group flex-1">
+                            <label for="edit-payment-amount">Amount (₹)</label>
+                            <input type="number" step="0.01" id="edit-payment-amount" name="amount" required>
+                        </div>
+                        <div class="form-group flex-1">
+                            <label for="edit-payment-date">Date</label>
+                            <input type="date" id="edit-payment-date" name="investment_date" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('edit-payment-modal')">Cancel</button>
+                    <button type="submit" class="btn btn-success">Save Payment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         lucide.createIcons();
 
@@ -129,6 +354,50 @@
                 dateInput.value = new Date().toISOString().split('T')[0];
             }
         });
+
+        function openCategoryEditModal(id, name, logo, status) {
+            const form = document.getElementById('edit-category-form');
+            form.action = '/edit_finance/' + id;
+            document.getElementById('edit-cat-name').value = name;
+            document.getElementById('edit-cat-status').value = status || 'growing';
+
+            const isUrl = logo.startsWith('http') || logo.includes('/') || logo.includes('.');
+            if (isUrl) {
+                document.getElementById('edit-cat-custom-logo').value = logo;
+                document.querySelectorAll('#edit-category-modal input[type="radio"]').forEach(radio => radio.checked = false);
+            } else {
+                document.getElementById('edit-cat-custom-logo').value = '';
+                const targetRadio = document.getElementById('edit-logo-' + logo);
+                if (targetRadio) {
+                    targetRadio.checked = true;
+                } else {
+                    const defaultRadio = document.getElementById('edit-logo-wallet');
+                    if (defaultRadio) defaultRadio.checked = true;
+                }
+            }
+
+            document.getElementById('edit-category-modal').classList.add('active');
+        }
+
+        function openEditPaymentModal(id, amount, description, dateString, subcategoryId) {
+            document.getElementById('edit-payment-id').value = id;
+            document.getElementById('edit-payment-amount').value = parseFloat(amount) || 0;
+            document.getElementById('edit-payment-description').value = description || '';
+            document.getElementById('edit-payment-date').value = dateString;
+            const subSelect = document.getElementById('edit-payment-subcategory');
+            if (subSelect && subcategoryId !== null) {
+                subSelect.value = subcategoryId;
+            }
+            openModal('edit-payment-modal');
+        }
+
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('active');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
     </script>
 </body>
 </html>
