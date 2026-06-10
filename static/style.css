@@ -1452,6 +1452,88 @@ select:focus {
     cursor: default;
 }
 
+/* --- Subcategory Mini Icons & Header Icon --- */
+.subcategory-logos-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+    align-items: center;
+}
+
+.subcategory-mini-logo {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.subcategory-mini-logo:hover {
+    border-color: var(--primary);
+    transform: translateY(-2px);
+    background: rgba(99, 102, 241, 0.1);
+    box-shadow: 0 0 10px rgba(99, 102, 241, 0.25);
+}
+
+.subcategory-mini-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.subcategory-mini-logo i,
+.subcategory-mini-icon {
+    width: 14px;
+    height: 14px;
+    color: var(--text-muted);
+    transition: var(--transition);
+}
+
+.subcategory-mini-logo:hover i,
+.subcategory-mini-logo:hover .subcategory-mini-icon {
+    color: var(--primary);
+}
+
+.payment-history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.subcategory-header-icon-wrapper {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: rgba(99, 102, 241, 0.15);
+    border: 1px solid var(--border-hover);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    box-shadow: 0 0 15px rgba(99, 102, 241, 0.2);
+    flex-shrink: 0;
+}
+
+.subcategory-header-icon-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.subcategory-header-icon-wrapper i {
+    width: 20px;
+    height: 20px;
+    color: var(--primary);
+}
+
+
 /* --- Responsiveness Media Queries --- */
 @media (max-width: 1400px) {
     .finance-grid {

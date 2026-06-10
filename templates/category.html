@@ -74,19 +74,19 @@
             </section>
             {% else %}
             <section class="subcategory-cards-grid glass-card">
-                <div class="section-header">
+                <!-- <div class="section-header">
                     <h3><i data-lucide="layers" class="text-primary"></i> Select a Subcategory</h3>
                     <p class="text-muted">Click a subcategory block to view its investments.</p>
-                </div>
+                </div> -->
                 <div class="summary-stat-row">
-                    <div class="stat-card">
+                    <!-- <div class="stat-card">
                         <span class="stat-label">Total Payments</span>
                         <strong class="stat-value">₹{{ "{:,.2f}".format(total_amount) }}</strong>
-                    </div>
-                    <div class="stat-card">
+                    </div> -->
+                    <!-- <div class="stat-card">
                         <span class="stat-label">Subcategories</span>
                         <strong class="stat-value">{{ subcategories|length }}</strong>
-                    </div>
+                    </div> -->
                 </div>
                 {% if subcategories %}
                 <div class="subcategory-cards">
@@ -148,9 +148,24 @@
 
             {% if selected_subcategory %}
             <section class="history-content-card glass-card">
-                <div class="section-header">
-                    <h3><i data-lucide="clock" class="text-warning"></i> Payment History</h3>
-                    <p class="text-muted">Chronological view of investments in this subcategory</p>
+                <div class="section-header payment-history-header">
+                    <div>
+                        <h3><i data-lucide="clock" class="text-warning"></i> Payment History</h3>
+                        <p class="text-muted">Chronological view of investments in this subcategory</p>
+                    </div>
+                    {% if selected_subcategory %}
+                        <div class="subcategory-header-icon-wrapper" title="{{ selected_subcategory.name }}">
+                            {% if selected_subcategory.icon %}
+                                {% if selected_subcategory.icon.startswith('http') or '/' in selected_subcategory.icon or '.' in selected_subcategory.icon %}
+                                    <img src="{{ selected_subcategory.icon }}" class="subcategory-header-icon-img" alt="{{ selected_subcategory.name }} icon">
+                                {% else %}
+                                    <i data-lucide="{{ selected_subcategory.icon }}"></i>
+                                {% endif %}
+                            {% else %}
+                                <i data-lucide="layers"></i>
+                            {% endif %}
+                        </div>
+                    {% endif %}
                 </div>
                 {% if investments %}
                     <div class="history-table">

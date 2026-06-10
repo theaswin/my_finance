@@ -121,13 +121,32 @@
                             <div class="balance-value">₹{{ "{:,.2f}".format(finance.total_amount) }}</div>
                         </div>
 
+                        <!-- Subcategory Mini Logos Row -->
+                        {% if finance.sub_categories %}
+                            <div class="subcategory-logos-row">
+                                {% for sub in finance.sub_categories %}
+                                    <span class="subcategory-mini-logo" title="{{ sub.name }}" onclick="event.stopPropagation(); window.location.href='/history/{{ finance.id }}/{{ sub.id }}'">
+                                        {% if sub.icon %}
+                                            {% if sub.icon.startswith('http') or '/' in sub.icon or '.' in sub.icon %}
+                                                <img src="{{ sub.icon }}" class="subcategory-mini-img" alt="{{ sub.name }}">
+                                            {% else %}
+                                                <i data-lucide="{{ sub.icon }}" class="subcategory-mini-icon"></i>
+                                            {% endif %}
+                                        {% else %}
+                                            <i data-lucide="layers" class="subcategory-mini-icon"></i>
+                                        {% endif %}
+                                    </span>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+
                         <div id="finance-expanded-{{ finance.id }}" class="finance-expanded-content collapsible-form-container">
                             <div class="subcategory-panel">
                                 <div class="section-label">Subcategories</div>
                                 {% if finance.sub_categories %}
                                     <div class="subcategory-list">
                                         {% for sub in finance.sub_categories %}
-                                            <div class="subcategory-item" data-subcategory-id="{{ sub.id }}" onclick="event.stopPropagation(); window.location.href='/category/{{ finance.id }}/subcategory/{{ sub.id }}'">
+                                            <div class="subcategory-item" data-subcategory-id="{{ sub.id }}" onclick="event.stopPropagation(); window.location.href='/history/{{ finance.id }}/{{ sub.id }}'">
                                                 <span>{{ sub.name }}</span>
                                                 <span class="badge">{{ sub.payments|length }}</span>
                                             </div>
