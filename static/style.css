@@ -1155,8 +1155,48 @@ select:focus {
 
 .chart-canvas-wrapper {
     position: relative;
-    height: 350px;
+    height: 340px;
     width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.portfolio-chart svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border-radius: 18px;
+    overflow: hidden;
+}
+
+.portfolio-chart .chart-footer {
+    margin-top: 10px;
+}
+
+.portfolio-chart .stat-card {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.06);
+}
+
+.portfolio-chart .stat-label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text-muted);
+    font-size: 12px;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+}
+
+.portfolio-chart .stat-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.portfolio-chart .text-success {
+    color: var(--success) !important;
 }
 
 /* --- History Page Layout --- */
