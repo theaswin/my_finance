@@ -146,6 +146,13 @@ class PortfolioGrowth(db.Model):
         default=0
     )
 
+    # Optional JSON metadata to store per-category breakdowns or monthly additions
+    meta = db.Column(
+        db.Text,
+        nullable=True,
+        doc="JSON string with optional keys: 'category_series', 'monthly'"
+    )
+
     __table_args__ = (
         db.UniqueConstraint('year', 'month', name='uix_year_month'),
     )

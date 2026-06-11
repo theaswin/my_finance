@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, redirect, jsonify
 from datetime import datetime, date
 from calendar import monthrange
+import json
 from sqlalchemy import func, extract, text
 from collections import defaultdict
 from models import db, Finance, Investment, PortfolioGrowth, SubCategory
@@ -76,6 +77,18 @@ def ensure_subcategory_schema():
             conn.commit()
 
 
+def ensure_portfolio_meta_column():
+    """Ensure PortfolioGrowth.meta column exists (SQLite ALTER TABLE if needed)."""
+    engine = db.engine
+    if engine.dialect.name == 'sqlite':
+        with engine.connect() as conn:
+            cols = conn.execute(text("PRAGMA table_info(portfolio_growth)")).fetchall()
+            existing = {row[1] for row in cols}
+            if 'meta' not in existing:
+                conn.execute(text("ALTER TABLE portfolio_growth ADD COLUMN meta TEXT"))
+                conn.commit()
+
+
 def sync_portfolio_growth():
     """Synchronize the PortfolioGrowth table for each month of the current year."""
     today = date.today()
@@ -110,40 +123,57 @@ def sync_portfolio_growth():
 
 def get_monthly_chart_data(current_net_worth=None):
     """Load monthly portfolio growth from PortfolioGrowth database table and calculate category breakdowns."""
-    # Sync database records first
-    sync_portfolio_growth()
-    
-    growth_records = PortfolioGrowth.query.order_by(PortfolioGrowth.year, PortfolioGrowth.month).all()
-    
+    today = date.today()
+    current_year = today.year
+
     month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-    labels = [f"{record.year} {month_names[record.month - 1]}" for record in growth_records]
-    totals = [round(record.total, 2) for record in growth_records]
-    
-    monthly_changes = []
-    for index, record in enumerate(growth_records):
-        total = record.total
-        if index == 0:
-            monthly_changes.append(total)
-        else:
-            monthly_changes.append(round(total - totals[index - 1], 2))
-            
-    # Calculate category breakdowns for each month in labels
+    labels = [f"{current_year} {mn}" for mn in month_names]
+
+    cumulative = [None] * 12
+    monthly = [None] * 12
+
     category_series = {}
     finances = Finance.query.all()
-    all_investments = Investment.query.order_by(Investment.investment_date).all()
-    
     for f in finances:
-        series = []
-        for record in growth_records:
-            last_day = date(record.year, record.month, monthrange(record.year, record.month)[1])
-            total_for_cat_and_month = sum(inv.amount for inv in all_investments if inv.finance_id == f.id and inv.investment_date <= last_day)
-            series.append(round(total_for_cat_and_month, 2))
-        category_series[f.name] = series
-        
+        category_series[f.name] = [None] * 12
+
+    records = PortfolioGrowth.query.filter_by(year=current_year).order_by(PortfolioGrowth.month).all()
+    last_total = None
+    for record in records:
+        index = record.month - 1
+        cumulative[index] = round(record.total, 2)
+
+        if last_total is None:
+            monthly[index] = round(record.total, 2)
+        else:
+            monthly[index] = round(record.total - last_total, 2)
+
+        if record.meta:
+            try:
+                meta = json.loads(record.meta)
+                if isinstance(meta.get('monthly_value'), (int, float)):
+                    monthly[index] = round(meta['monthly_value'], 2)
+                elif isinstance(meta.get('monthly'), (int, float)):
+                    monthly[index] = round(meta['monthly'], 2)
+
+                if isinstance(meta.get('category_series'), dict):
+                    for cat_name, value in meta['category_series'].items():
+                        if cat_name not in category_series:
+                            continue
+
+                        if isinstance(value, (int, float)):
+                            category_series[cat_name][index] = round(value, 2)
+                        elif isinstance(value, list) and len(value) > index:
+                            category_series[cat_name][index] = round(value[index], 2)
+            except Exception:
+                pass
+
+        last_total = record.total
+
     return {
         "labels": labels,
-        "cumulative": totals,
-        "monthly": monthly_changes,
+        "cumulative": cumulative,
+        "monthly": monthly,
         "category_series": category_series,
     }
 
@@ -413,10 +443,54 @@ def delete_investment(id):
     return redirect(request.referrer or "/")
 
 
+@app.route("/update_portfolio_growth", methods=["POST"])
+def update_portfolio_growth():
+    """Upsert a PortfolioGrowth record for a given year+month.
+
+    Accepts form fields: year, month, total, and optional meta (JSON string or object).
+    """
+    data = request.form.to_dict() if request.form else (request.get_json(silent=True) or {})
+    year = data.get('year')
+    month = data.get('month')
+    total = data.get('total')
+    meta = data.get('meta')
+
+    try:
+        year = int(year)
+        month = int(month)
+    except Exception:
+        return jsonify({'error': 'Invalid year or month'}), 400
+
+    try:
+        total_value = float(total) if total is not None else 0.0
+    except Exception:
+        total_value = 0.0
+
+    record = PortfolioGrowth.query.filter_by(year=year, month=month).first()
+    if record:
+        record.total = round(total_value, 2)
+        if meta:
+            # store as JSON string
+            record.meta = json.dumps(meta) if not isinstance(meta, str) else meta
+    else:
+        new = PortfolioGrowth(
+            date=f"{year} {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][month-1]}",
+            year=year,
+            month=month,
+            total=round(total_value, 2),
+            meta=(json.dumps(meta) if meta and not isinstance(meta, str) else meta)
+        )
+        db.session.add(new)
+
+    db.session.commit()
+    return jsonify({'status': 'ok'})
+
+
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
         ensure_finance_status_column()
         ensure_subcategory_schema()
+        ensure_portfolio_meta_column()
 
     app.run(debug=True)

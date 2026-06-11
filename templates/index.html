@@ -258,58 +258,7 @@
             {% endfor %}
         </main>
 
-        <!-- Portfolio Growth Chart Section -->
-        <section class="chart-section glass-card portfolio-chart">
-            <div class="chart-header">
-                <div class="chart-title-group">
-                    <div class="chart-icon-wrapper">
-                        <i data-lucide="area-chart"></i>
-                    </div>
-                    <div>
-                        <h2 class="chart-title">Portfolio Growth</h2>
-                        <p class="chart-subtitle">Performance trend below shows movement across recent months.</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="chart-canvas-wrapper" style="min-height:320px; display:flex; justify-content:flex-start; padding-left:1px;">
-                <svg viewBox="0 0 1000 310" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-                    <defs>
-                        <linearGradient id="growthGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stop-color="#22c55e" stop-opacity="0.35"/>
-                            <stop offset="100%" stop-color="#22c55e" stop-opacity="0"/>
-                        </linearGradient>
-                    </defs>
-
-                    <!-- Grid -->
-                    <line x1="50" y1="70" x2="950" y2="70" stroke="rgba(255,255,255,0.08)"/>
-                    <line x1="50" y1="120" x2="950" y2="120" stroke="rgba(255,255,255,0.08)"/>
-                    <line x1="50" y1="170" x2="950" y2="170" stroke="rgba(255,255,255,0.08)"/>
-                    <line x1="50" y1="220" x2="950" y2="220" stroke="rgba(255,255,255,0.08)"/>
-                    <line x1="50" y1="270" x2="950" y2="270" stroke="rgba(255,255,255,0.08)"/>
-
-                    <!-- Area Fill -->
-                    <path d="M120 240 L290 160 L290 300 L950 300 L950 300 L120 300 Z" fill="url(#growthGradient)"/>
-
-                    <!-- Growth Line -->
-                    <polyline points="120,240 290,160" fill="none" stroke="#16a34a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-
-                    <!-- Points -->
-                    <circle cx="120" cy="240" r="3" fill="#16a34a"/>
-                    <circle cx="290" cy="160" r="3" fill="#16a34a"/>
-
-                    <!-- Labels -->
-                    <text x="115" y="300" fill="#94a3b8" font-size="13">May</text>
-                    <text x="285" y="300" fill="#94a3b8" font-size="13">Jun</text>
-
-                    <!-- Values -->
-                    <text x="100" y="220" fill="#f8fafc" font-size="12">₹100,000</text>
-                    <text x="275" y="140" fill="#f8fafc" font-size="12">₹128,620</text>
-                </svg>
-            </div>
-
-            
-        </section>
+        {% include 'portfolio_growth.html' %}
 
         <!-- ============================================================================= -->
     </div>

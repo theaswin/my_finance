@@ -1,0 +1,256 @@
+<!-- Portfolio Growth Chart Partial -->
+<section class="chart-section glass-card portfolio-chart">
+    <div class="chart-header">
+        <div class="chart-title-group">
+            <div class="chart-icon-wrapper">
+                <i data-lucide="area-chart"></i>
+            </div>
+            <div>
+                <h2 class="chart-title">Portfolio Growth</h2>
+                <p class="chart-subtitle">Performance trend below shows movement across recent months.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="chart-canvas-wrapper" style="min-height:320px; display:flex; justify-content:flex-start; padding-left:1px;">
+        <canvas id="portfolioChart" style="width:100%; height:100%;"></canvas>
+        <!-- SVG fallback / decorative area chart retained for visual assist -->
+        
+    </div>
+
+    {% if chart_data and chart_data.labels | length > 0 %}
+    <script>
+    (function() {
+        const chartData = {{ chart_data | tojson }};
+        const ctx = document.getElementById('portfolioChart').getContext('2d');
+
+        const categoryColors = [
+            { line: '#6366f1', fill: 'rgba(99, 102, 241, 0.08)' },
+            { line: '#10b981', fill: 'rgba(16, 185, 129, 0.08)' },
+            { line: '#f59e0b', fill: 'rgba(245, 158, 11, 0.08)' },
+            { line: '#f43f5e', fill: 'rgba(244, 63, 94, 0.08)' },
+            { line: '#8b5cf6', fill: 'rgba(139, 92, 246, 0.08)' },
+            { line: '#06b6d4', fill: 'rgba(6, 182, 212, 0.08)' },
+            { line: '#ec4899', fill: 'rgba(236, 72, 153, 0.08)' },
+            { line: '#14b8a6', fill: 'rgba(20, 184, 166, 0.08)' },
+        ];
+
+        function createGradient(ctx, color1, color2) {
+            const gradient = ctx.createLinearGradient(0, 0, 0, ctx.canvas.height);
+            gradient.addColorStop(0, color1);
+            gradient.addColorStop(1, color2);
+            return gradient;
+        }
+
+        function getCumulativeDatasets() {
+            const validCumulative = chartData.cumulative.filter(value => value !== null && value !== undefined);
+            const lastIndex = validCumulative.length - 1;
+            const lastValue = validCumulative[lastIndex];
+            const prevValue = lastIndex > 0 ? validCumulative[lastIndex - 1] : null;
+            const isUp = prevValue === null ? true : lastValue >= prevValue;
+            const lineColor = isUp ? '#22c55e' : '#ef4444';
+            const gradientColor = isUp ? 'rgba(34, 197, 94, 0.25)' : 'rgba(239, 68, 68, 0.25)';
+            const gradientFade = isUp ? 'rgba(34, 197, 94, 0.0)' : 'rgba(239, 68, 68, 0.0)';
+            const mainGradient = createGradient(ctx, gradientColor, gradientFade);
+            const datasets = [{
+                label: 'Total Portfolio Value',
+                data: chartData.cumulative,
+                borderColor: lineColor,
+                backgroundColor: mainGradient,
+                fill: true,
+                tension: 0.4,
+                borderWidth: 2.5,
+                pointBackgroundColor: lineColor,
+                pointBorderColor: '#0f172a',
+                pointBorderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 7,
+                pointHoverBackgroundColor: lineColor,
+                pointHoverBorderColor: '#fff',
+                pointHoverBorderWidth: 2,
+            }];
+
+            let colorIndex = 1;
+            for (const [catName, series] of Object.entries(chartData.category_series)) {
+                const color = categoryColors[colorIndex % categoryColors.length];
+                datasets.push({
+                    label: catName,
+                    data: series,
+                    borderColor: color.line,
+                    backgroundColor: color.fill,
+                    fill: false,
+                    tension: 0.4,
+                    borderWidth: 1.5,
+                    borderDash: [5, 5],
+                    pointBackgroundColor: color.line,
+                    pointBorderColor: '#0f172a',
+                    pointBorderWidth: 1.5,
+                    pointRadius: 3,
+                    pointHoverRadius: 6,
+                });
+                colorIndex++;
+            }
+
+            return datasets;
+        }
+
+        function getMonthlyDatasets() {
+            const barGradient = createGradient(ctx, 'rgba(16, 185, 129, 0.35)', 'rgba(16, 185, 129, 0.0)');
+            return [{
+                label: 'Monthly Net Additions',
+                data: chartData.monthly,
+                borderColor: '#10b981',
+                backgroundColor: barGradient,
+                fill: true,
+                tension: 0.4,
+                borderWidth: 2.5,
+                pointBackgroundColor: '#10b981',
+                pointBorderColor: '#0f172a',
+                pointBorderWidth: 2,
+                pointRadius: 5,
+                pointHoverRadius: 8,
+                pointHoverBackgroundColor: '#10b981',
+                pointHoverBorderColor: '#fff',
+                pointHoverBorderWidth: 2,
+            }];
+        }
+
+        function trimLeadingNullData(labels, datasets) {
+            const firstValidIndex = labels.findIndex((_, idx) =>
+                datasets.some(dataset => dataset.data[idx] !== null && dataset.data[idx] !== undefined)
+            );
+            const startIndex = firstValidIndex === -1 ? 0 : firstValidIndex;
+            return {
+                labels: labels.slice(startIndex),
+                datasets: datasets.map(dataset => ({
+                    ...dataset,
+                    data: dataset.data.slice(startIndex)
+                }))
+            };
+        }
+
+        const chartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    align: 'end',
+                    labels: {
+                        color: '#94a3b8',
+                        font: {
+                            family: "'Plus Jakarta Sans', sans-serif",
+                            size: 12,
+                            weight: 500,
+                        },
+                        usePointStyle: true,
+                        pointStyle: 'circle',
+                        padding: 20,
+                        boxWidth: 8,
+                    },
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                    titleColor: '#f8fafc',
+                    bodyColor: '#94a3b8',
+                    borderColor: 'rgba(99, 102, 241, 0.3)',
+                    borderWidth: 1,
+                    cornerRadius: 10,
+                    padding: 14,
+                    titleFont: {
+                        family: "'Plus Jakarta Sans', sans-serif",
+                        size: 13,
+                        weight: 700,
+                    },
+                    bodyFont: {
+                        family: "'Plus Jakarta Sans', sans-serif",
+                        size: 12,
+                    },
+                    displayColors: true,
+                    usePointStyle: true,
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ':  ₹' + context.parsed.y.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                        }
+                    }
+                },
+            },
+            scales: {
+                x: {
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.04)',
+                        drawBorder: false,
+                    },
+                    ticks: {
+                        color: '#64748b',
+                        font: {
+                            family: "'Plus Jakarta Sans', sans-serif",
+                            size: 11,
+                            weight: 500,
+                        },
+                        maxRotation: 45,
+                        minRotation: 0,
+                    },
+                    border: {
+                        display: false,
+                    }
+                },
+                y: {
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.04)',
+                        drawBorder: false,
+                    },
+                    ticks: {
+                        color: '#64748b',
+                        font: {
+                            family: "'Plus Jakarta Sans', sans-serif",
+                            size: 11,
+                            weight: 500,
+                        },
+                        callback: function(value) {
+                            return '₹' + value.toLocaleString('en-IN');
+                        },
+                        padding: 10,
+                    },
+                    border: {
+                        display: false,
+                    },
+                    beginAtZero: true,
+                }
+            },
+            animation: {
+                duration: 800,
+                easing: 'easeInOutQuart',
+            },
+        };
+
+        const trimmedCumulative = trimLeadingNullData(chartData.labels, getCumulativeDatasets());
+        let portfolioChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: trimmedCumulative.labels,
+                datasets: trimmedCumulative.datasets,
+            },
+            options: chartOptions,
+        });
+
+        window.switchChartView = function(view) {
+            document.querySelectorAll('.chart-toggle-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.view === view);
+            });
+
+            const datasets = view === 'cumulative' ? getCumulativeDatasets() : getMonthlyDatasets();
+            const trimmed = trimLeadingNullData(chartData.labels, datasets);
+            portfolioChart.data.labels = trimmed.labels;
+            portfolioChart.data.datasets = trimmed.datasets;
+            portfolioChart.update('active');
+        };
+    })();
+    </script>
+    {% endif %}
+</section>
