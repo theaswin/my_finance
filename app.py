@@ -1,17 +1,53 @@
 from flask import Flask, render_template, request, redirect, jsonify
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from datetime import datetime, date
 from calendar import monthrange
 import json
 from sqlalchemy import func, extract, text
 from collections import defaultdict
-from models import db, Finance, Investment, PortfolioGrowth, SubCategory
+from models import db, Finance, Investment, PortfolioGrowth, SubCategory, User
 
 app = Flask(__name__)
 
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///finance.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SECRET_KEY"] = "your-secret-key-change-this"
 
 db.init_app(app)
+
+# Initialize Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = "login"
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    return db.session.get(User, int(user_id))
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+        
+        user = User.query.filter_by(username=username).first()
+        
+        if user and user.check_password(password):
+            login_user(user)
+            return redirect("/")
+        else:
+            return render_template("login.html", error="Invalid username or password")
+    
+    return render_template("login.html")
+
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    return redirect("/login")
 
 
 def ensure_finance_status_column():
@@ -179,6 +215,7 @@ def get_monthly_chart_data(current_net_worth=None):
 
 
 @app.route("/")
+@login_required
 def home():
     finances = Finance.query.all()
     
@@ -256,6 +293,7 @@ def load_finance_context(finance_id=None, subcategory_id=None):
 @app.route("/history")
 @app.route("/history/<int:finance_id>")
 @app.route("/history/<int:finance_id>/<int:subcategory_id>")
+@login_required
 def payment_history(finance_id=None, subcategory_id=None):
     finances, selected_finance, subcategories, selected_subcategory, investments, total_amount = load_finance_context(finance_id, subcategory_id)
 
@@ -275,6 +313,7 @@ def payment_history(finance_id=None, subcategory_id=None):
 
 @app.route("/category/<int:finance_id>")
 @app.route("/category/<int:finance_id>/subcategory/<int:subcategory_id>")
+@login_required
 def category_page(finance_id, subcategory_id=None):
     finances, selected_finance, subcategories, selected_subcategory, investments, total_amount = load_finance_context(finance_id, subcategory_id)
     if selected_finance is None and finances:
@@ -292,6 +331,7 @@ def category_page(finance_id, subcategory_id=None):
 
 
 @app.route("/category")
+@login_required
 def category_redirect():
     finances = Finance.query.order_by(Finance.name).all()
     if finances:
@@ -300,12 +340,14 @@ def category_redirect():
 
 
 @app.route("/api/chart_data")
+@login_required
 def api_chart_data():
     """JSON API for chart data (useful for future AJAX refresh)."""
     return jsonify(get_monthly_chart_data())
 
 
 @app.route("/add_finance", methods=["POST"])
+@login_required
 def add_finance():
     name = request.form.get("name", "").strip()
     custom_logo = request.form.get("custom_logo", "").strip()
@@ -321,6 +363,7 @@ def add_finance():
 
 
 @app.route("/add_subcategory", methods=["POST"])
+@login_required
 def add_subcategory():
     finance_id = request.form.get("finance_id")
     name = request.form.get("name", "").strip()
@@ -337,6 +380,7 @@ def add_subcategory():
 
 
 @app.route("/edit_finance/<int:id>", methods=["POST"])
+@login_required
 def edit_finance(id):
     finance = db.session.get(Finance, id)
     if finance:
@@ -355,6 +399,7 @@ def edit_finance(id):
 
 
 @app.route("/delete_finance/<int:id>")
+@login_required
 def delete_finance(id):
     finance = db.session.get(Finance, id)
     if finance:
@@ -364,6 +409,7 @@ def delete_finance(id):
 
 
 @app.route("/add_investment", methods=["POST"])
+@login_required
 def add_investment():
     subcategory_id = request.form.get("subcategory_id")
     amount_str = request.form.get("amount", "0")
@@ -400,6 +446,7 @@ def add_investment():
 
 
 @app.route("/update_investment", methods=["POST"])
+@login_required
 def update_investment():
     investment_id = request.form.get("investment_id")
     amount_str = request.form.get("amount", "0")
@@ -434,6 +481,7 @@ def update_investment():
 
 
 @app.route("/delete_investment/<int:id>")
+@login_required
 def delete_investment(id):
     investment = db.session.get(Investment, id)
     if investment:
@@ -444,6 +492,7 @@ def delete_investment(id):
 
 
 @app.route("/update_portfolio_growth", methods=["POST"])
+@login_required
 def update_portfolio_growth():
     """Upsert a PortfolioGrowth record for a given year+month.
 
@@ -492,5 +541,19 @@ if __name__ == "__main__":
         ensure_finance_status_column()
         ensure_subcategory_schema()
         ensure_portfolio_meta_column()
+        
+        # Create or update default user
+        default_user = User.query.filter_by(username="aswin").first()
+        if not default_user:
+            default_user = User(username="aswin")
+            default_user.set_password("perfin")
+            db.session.add(default_user)
+            db.session.commit()
+            print("Default user 'aswin' created successfully!")
+        else:
+            # Update password if user exists
+            default_user.set_password("perfin")
+            db.session.commit()
+            print("Default user 'aswin' password updated successfully!")
 
     app.run(host='0.0.0.0', debug=True)

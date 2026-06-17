@@ -1,5 +1,6 @@
 Flask==3.1.1
 Flask-SQLAlchemy==3.1.1
+Flask-Login==0.6.3
 SQLAlchemy==2.0.41
 greenlet==3.2.3
 blinker==1.9.0

@@ -17,6 +17,9 @@
             <a href="/" class="btn btn-secondary btn-sm">
                 <i data-lucide="arrow-left"></i> Dashboard
             </a>
+            <a href="{{ url_for('logout') }}" class="btn btn-secondary btn-sm" style="margin-left: auto; background: #f44336;">
+                <i data-lucide="log-out"></i> Logout ({{ current_user.username }})
+            </a>
         </div>
 
         {% if selected_finance %}

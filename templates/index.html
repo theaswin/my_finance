@@ -87,6 +87,9 @@
                 <button class="btn btn-primary" onclick="openModal('add-category-modal')">
                     <i data-lucide="plus"></i> New Category
                 </button>
+                <a href="{{ url_for('logout') }}" class="btn btn-secondary" style="margin-left: 10px; background: #f44336;">
+                    <i data-lucide="log-out"></i> Logout ({{ current_user.username }})
+                </a>
             </div>
         </header>
 
