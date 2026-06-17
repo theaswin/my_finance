@@ -493,4 +493,4 @@ if __name__ == "__main__":
         ensure_subcategory_schema()
         ensure_portfolio_meta_column()
 
-    app.run(debug=True)
+    app.run(host='0.0.0.0', debug=True)
