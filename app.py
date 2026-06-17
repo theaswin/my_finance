@@ -1,11 +1,11 @@
-from flask import Flask, render_template, request, redirect, jsonify
+from flask import Flask, render_template, request, redirect, jsonify, session
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from datetime import datetime, date
 from calendar import monthrange
 import json
 from sqlalchemy import func, extract, text
 from collections import defaultdict
-from models import db, Finance, Investment, PortfolioGrowth, SubCategory, User
+from models import db, Finance, Investment, PortfolioGrowth, SubCategory, User, AppMode, TrackingStock, StockPriceLine
 
 app = Flask(__name__)
 
@@ -28,19 +28,26 @@ def load_user(user_id):
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    modes = AppMode.query.order_by(AppMode.name).all()
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
+        active_mode_id = request.form.get("active_mode_id")
         
         user = User.query.filter_by(username=username).first()
         
         if user and user.check_password(password):
+            if active_mode_id:
+                user.active_mode_id = int(active_mode_id)
+                db.session.commit()
             login_user(user)
+            if user.active_mode and user.active_mode.name == "Stock":
+                return redirect("/stock")
             return redirect("/")
         else:
-            return render_template("login.html", error="Invalid username or password")
+            return render_template("login.html", error="Invalid username or password", modes=modes)
     
-    return render_template("login.html")
+    return render_template("login.html", modes=modes)
 
 
 @app.route("/logout")
@@ -217,6 +224,9 @@ def get_monthly_chart_data(current_net_worth=None):
 @app.route("/")
 @login_required
 def home():
+    if current_user.active_mode and current_user.active_mode.name == "Stock":
+        return redirect("/stock")
+        
     finances = Finance.query.all()
     
     # Calculate global dashboard metrics
@@ -295,6 +305,9 @@ def load_finance_context(finance_id=None, subcategory_id=None):
 @app.route("/history/<int:finance_id>/<int:subcategory_id>")
 @login_required
 def payment_history(finance_id=None, subcategory_id=None):
+    if current_user.active_mode and current_user.active_mode.name == "Stock":
+        return redirect("/stock")
+        
     finances, selected_finance, subcategories, selected_subcategory, investments, total_amount = load_finance_context(finance_id, subcategory_id)
 
     if selected_finance is None and finances:
@@ -315,6 +328,9 @@ def payment_history(finance_id=None, subcategory_id=None):
 @app.route("/category/<int:finance_id>/subcategory/<int:subcategory_id>")
 @login_required
 def category_page(finance_id, subcategory_id=None):
+    if current_user.active_mode and current_user.active_mode.name == "Stock":
+        return redirect("/stock")
+        
     finances, selected_finance, subcategories, selected_subcategory, investments, total_amount = load_finance_context(finance_id, subcategory_id)
     if selected_finance is None and finances:
         return redirect(f"/category/{finances[0].id}")
@@ -333,6 +349,9 @@ def category_page(finance_id, subcategory_id=None):
 @app.route("/category")
 @login_required
 def category_redirect():
+    if current_user.active_mode and current_user.active_mode.name == "Stock":
+        return redirect("/stock")
+        
     finances = Finance.query.order_by(Finance.name).all()
     if finances:
         return redirect(f"/category/{finances[0].id}")
@@ -535,9 +554,313 @@ def update_portfolio_growth():
     return jsonify({'status': 'ok'})
 
 
+@app.context_processor
+def inject_modes():
+    if current_user.is_authenticated:
+        return {
+            "all_modes": AppMode.query.order_by(AppMode.name).all(),
+            "current_mode": current_user.active_mode
+        }
+    return {
+        "all_modes": [],
+        "current_mode": None
+    }
+
+
+@app.route("/switch_mode/<int:mode_id>")
+@login_required
+def switch_mode(mode_id):
+    mode = db.session.get(AppMode, mode_id)
+    if mode:
+        current_user.active_mode_id = mode.id
+        db.session.commit()
+    if mode and mode.name == "Stock":
+        return redirect("/stock")
+    return redirect("/")
+
+
+@app.route("/stock")
+@login_required
+def stock_view():
+    if current_user.active_mode and current_user.active_mode.name == "Finance":
+        return redirect("/")
+        
+    stocks = TrackingStock.query.order_by(TrackingStock.stock_name).all()
+    today_date = date.today().isoformat()
+    return render_template("stock.html", stocks=stocks, today_date=today_date)
+
+
+@app.route("/add_stock", methods=["POST"])
+@login_required
+def add_stock():
+    if current_user.active_mode and current_user.active_mode.name == "Finance":
+        return redirect("/")
+        
+    stock_name = request.form.get("stock_name", "").strip()
+    logo = request.form.get("logo", "").strip()
+    earnings_str = request.form.get("earnings", "0")
+    lost_str = request.form.get("lost", "0")
+    
+    try:
+        earnings = float(earnings_str) if earnings_str else 0.0
+    except ValueError:
+        earnings = 0.0
+        
+    try:
+        lost = float(lost_str) if lost_str else 0.0
+    except ValueError:
+        lost = 0.0
+        
+    if stock_name:
+        stock = TrackingStock(
+            stock_name=stock_name,
+            logo=logo or None,
+            earnings=earnings,
+            lost=lost
+        )
+        db.session.add(stock)
+        db.session.commit()
+        
+        # Add initial price line if low/high specified
+        low_str = request.form.get("low", "").strip()
+        high_str = request.form.get("high", "").strip()
+        date_str = request.form.get("date", "").strip()
+        
+        if low_str or high_str or date_str:
+            try:
+                low = float(low_str) if low_str else 0.0
+            except ValueError:
+                low = 0.0
+            try:
+                high = float(high_str) if high_str else 0.0
+            except ValueError:
+                high = 0.0
+            if date_str:
+                try:
+                    stock_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+                except ValueError:
+                    stock_date = date.today()
+            else:
+                stock_date = date.today()
+                
+            line = StockPriceLine(
+                stock_id=stock.id,
+                low=low,
+                high=high,
+                date=stock_date
+            )
+            db.session.add(line)
+            db.session.commit()
+        
+    return redirect("/stock")
+
+
+@app.route("/edit_stock/<int:id>", methods=["POST"])
+@login_required
+def edit_stock(id):
+    if current_user.active_mode and current_user.active_mode.name == "Finance":
+        return redirect("/")
+        
+    stock = db.session.get(TrackingStock, id)
+    if stock:
+        stock_name = request.form.get("stock_name", "").strip()
+        logo = request.form.get("logo", "").strip()
+        earnings_str = request.form.get("earnings", "0")
+        lost_str = request.form.get("lost", "0")
+        
+        try:
+            earnings = float(earnings_str) if earnings_str else 0.0
+        except ValueError:
+            earnings = 0.0
+            
+        try:
+            lost = float(lost_str) if lost_str else 0.0
+        except ValueError:
+            lost = 0.0
+            
+        if stock_name:
+            stock.stock_name = stock_name
+            stock.logo = logo or None
+            stock.earnings = earnings
+            stock.lost = lost
+            db.session.commit()
+            
+    return redirect("/stock")
+
+
+@app.route("/add_price_line/<int:stock_id>", methods=["POST"])
+@login_required
+def add_price_line(stock_id):
+    if current_user.active_mode and current_user.active_mode.name == "Finance":
+        return redirect("/")
+        
+    stock = db.session.get(TrackingStock, stock_id)
+    if stock:
+        low_str = request.form.get("low", "0").strip()
+        high_str = request.form.get("high", "0").strip()
+        date_str = request.form.get("date", "").strip()
+        
+        try:
+            low = float(low_str) if low_str else 0.0
+        except ValueError:
+            low = 0.0
+            
+        try:
+            high = float(high_str) if high_str else 0.0
+        except ValueError:
+            high = 0.0
+            
+        if date_str:
+            try:
+                stock_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            except ValueError:
+                stock_date = date.today()
+        else:
+            stock_date = date.today()
+            
+        line = StockPriceLine(
+            stock_id=stock.id,
+            low=low,
+            high=high,
+            date=stock_date
+        )
+        db.session.add(line)
+        db.session.commit()
+        
+    return redirect("/stock")
+
+
+@app.route("/edit_price_line/<int:id>", methods=["POST"])
+@login_required
+def edit_price_line(id):
+    if current_user.active_mode and current_user.active_mode.name == "Finance":
+        return redirect("/")
+        
+    line = db.session.get(StockPriceLine, id)
+    if line:
+        low_str = request.form.get("low", "0").strip()
+        high_str = request.form.get("high", "0").strip()
+        date_str = request.form.get("date", "").strip()
+        
+        try:
+            low = float(low_str) if low_str else 0.0
+        except ValueError:
+            low = 0.0
+            
+        try:
+            high = float(high_str) if high_str else 0.0
+        except ValueError:
+            high = 0.0
+            
+        if date_str:
+            try:
+                stock_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            except ValueError:
+                stock_date = date.today()
+        else:
+            stock_date = date.today()
+            
+        line.low = low
+        line.high = high
+        line.date = stock_date
+        db.session.commit()
+        
+    return redirect("/stock")
+
+
+@app.route("/delete_price_line/<int:id>")
+@login_required
+def delete_price_line(id):
+    if current_user.active_mode and current_user.active_mode.name == "Finance":
+        return redirect("/")
+        
+    line = db.session.get(StockPriceLine, id)
+    if line:
+        db.session.delete(line)
+        db.session.commit()
+        
+    return redirect("/stock")
+
+
+@app.route("/delete_stock/<int:id>")
+@login_required
+def delete_stock(id):
+    if current_user.active_mode and current_user.active_mode.name == "Finance":
+        return redirect("/")
+        
+    stock = db.session.get(TrackingStock, id)
+    if stock:
+        db.session.delete(stock)
+        db.session.commit()
+        
+    return redirect("/stock")
+
+
+def ensure_user_active_mode_column():
+    """Add user.active_mode_id column if it does not exist in SQLite."""
+    engine = db.engine
+    if engine.dialect.name == 'sqlite':
+        with engine.connect() as conn:
+            result = conn.execute(text("PRAGMA table_info(user)"))
+            existing_columns = {row[1] for row in result}
+            if 'active_mode_id' not in existing_columns:
+                conn.execute(text("ALTER TABLE user ADD COLUMN active_mode_id INTEGER REFERENCES app_mode(id)"))
+                conn.commit()
+
+
+def populate_app_modes():
+    """Populate default app modes if they don't exist."""
+    finance_mode = AppMode.query.filter_by(name="Finance").first()
+    if not finance_mode:
+        finance_mode = AppMode(name="Finance")
+        db.session.add(finance_mode)
+    
+    stock_mode = AppMode.query.filter_by(name="Stock").first()
+    if not stock_mode:
+        stock_mode = AppMode(name="Stock")
+        db.session.add(stock_mode)
+        
+    db.session.commit()
+    
+    # Also assign a default active mode to existing users
+    users = User.query.filter_by(active_mode_id=None).all()
+    for u in users:
+        u.active_mode_id = finance_mode.id
+    db.session.commit()
+
+
+def ensure_stock_schema():
+    """Ensure that stock_price_lines table and earnings/lost columns exist."""
+    engine = db.engine
+    if engine.dialect.name == 'sqlite':
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS stock_price_lines (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    stock_id INTEGER NOT NULL REFERENCES tracking_stocks(id) ON DELETE CASCADE,
+                    low REAL,
+                    high REAL,
+                    date DATE
+                )
+            """))
+            conn.commit()
+
+            result = conn.execute(text("PRAGMA table_info(tracking_stocks)"))
+            existing_columns = {row[1] for row in result}
+            if 'earnings' not in existing_columns:
+                conn.execute(text("ALTER TABLE tracking_stocks ADD COLUMN earnings REAL DEFAULT 0.0"))
+                conn.commit()
+            if 'lost' not in existing_columns:
+                conn.execute(text("ALTER TABLE tracking_stocks ADD COLUMN lost REAL DEFAULT 0.0"))
+                conn.commit()
+
+
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
+        ensure_user_active_mode_column()
+        populate_app_modes()
+        ensure_stock_schema()
         ensure_finance_status_column()
         ensure_subcategory_schema()
         ensure_portfolio_meta_column()

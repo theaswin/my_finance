@@ -160,12 +160,46 @@ class PortfolioGrowth(db.Model):
     )
 
 
+class AppMode(db.Model):
+    __tablename__ = "app_mode"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), unique=True, nullable=False)
+
+
+class TrackingStock(db.Model):
+    __tablename__ = "tracking_stocks"
+
+    id = db.Column(db.Integer, primary_key=True)
+    stock_name = db.Column(db.String(100), nullable=False)
+    logo = db.Column(db.String(500), nullable=True)
+    earnings = db.Column(db.Float, nullable=True, default=0.0)
+    lost = db.Column(db.Float, nullable=True, default=0.0)
+
+    price_lines = db.relationship("StockPriceLine", back_populates="stock", cascade="all, delete-orphan")
+
+
+class StockPriceLine(db.Model):
+    __tablename__ = "stock_price_lines"
+
+    id = db.Column(db.Integer, primary_key=True)
+    stock_id = db.Column(db.Integer, db.ForeignKey("tracking_stocks.id", ondelete="CASCADE"), nullable=False)
+    low = db.Column(db.Float, nullable=True, default=0.0)
+    high = db.Column(db.Float, nullable=True, default=0.0)
+    date = db.Column(db.Date, nullable=True, default=date.today)
+
+    stock = db.relationship("TrackingStock", back_populates="price_lines")
+
+
 class User(UserMixin, db.Model):
     __tablename__ = "user"
 
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
+    active_mode_id = db.Column(db.Integer, db.ForeignKey("app_mode.id"), nullable=True)
+
+    active_mode = db.relationship("AppMode", backref="users")
 
     def set_password(self, password):
         """Hash and set the password."""

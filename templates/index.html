@@ -84,11 +84,19 @@
 
             <!-- Div 5: Action Button Section -->
             <div class="action-section header-item">
+                <!-- <div class="mode-switcher" style="margin-right: 15px; display: inline-flex; align-items: center; gap: 8px;">
+                    <label style="font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">View Mode:</label>
+                    <select onchange="window.location.href='/switch_mode/' + this.value" style="padding: 8px 12px; font-size: 13px; font-weight: 600; border-radius: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--text-main); cursor: pointer; outline: none; width: auto; transition: var(--transition);">
+                        {% for mode in all_modes %}
+                            <option value="{{ mode.id }}" {% if current_mode and current_mode.id == mode.id %}selected{% endif %}>{{ mode.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div> -->
                 <button class="btn btn-primary" onclick="openModal('add-category-modal')">
                     <i data-lucide="plus"></i> New Category
                 </button>
                 <a href="{{ url_for('logout') }}" class="btn btn-secondary" style="margin-left: 10px; background: #f44336;">
-                    <i data-lucide="log-out"></i> Logout ({{ current_user.username }})
+                    <i data-lucide="log-out"></i> Logout 
                 </a>
             </div>
         </header>

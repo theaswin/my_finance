@@ -37,7 +37,7 @@
             color: #555;
             font-weight: bold;
         }
-        .form-group input {
+        .form-group input, .form-group select {
             width: 100%;
             padding: 12px;
             border: 2px solid #ddd;
@@ -45,8 +45,10 @@
             font-size: 16px;
             box-sizing: border-box;
             transition: border-color 0.3s;
+            background-color: white;
+            color: #333;
         }
-        .form-group input:focus {
+        .form-group input:focus, .form-group select:focus {
             outline: none;
             border-color: #667eea;
         }
@@ -115,6 +117,15 @@
                     required 
                     placeholder="Enter your password"
                 >
+            </div>
+
+            <div class="form-group">
+                <label for="active_mode_id">Mode:</label>
+                <select id="active_mode_id" name="active_mode_id" required>
+                    {% for mode in modes %}
+                        <option value="{{ mode.id }}">{{ mode.name }}</option>
+                    {% endfor %}
+                </select>
             </div>
             
             <button type="submit" class="btn-login">Login</button>
