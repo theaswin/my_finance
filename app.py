@@ -727,7 +727,7 @@ def add_price_line(stock_id):
         db.session.add(line)
         db.session.commit()
         
-    return redirect("/stock")
+    return redirect(f"/stock_detail/{stock_id}")
 
 
 @app.route("/edit_price_line/<int:id>", methods=["POST"])
@@ -775,11 +775,12 @@ def delete_price_line(id):
         return redirect("/")
         
     line = db.session.get(StockPriceLine, id)
+    stock_id = line.stock_id if line else None
     if line:
         db.session.delete(line)
         db.session.commit()
         
-    return redirect("/stock")
+    return redirect(f"/stock_detail/{stock_id}") if stock_id else redirect("/stock")
 
 
 @app.route("/delete_stock/<int:id>")
@@ -794,6 +795,20 @@ def delete_stock(id):
         db.session.commit()
         
     return redirect("/stock")
+
+
+@app.route("/stock_detail/<int:stock_id>")
+@login_required
+def stock_detail(stock_id):
+    if current_user.active_mode and current_user.active_mode.name == "Finance":
+        return redirect("/")
+        
+    stock = db.session.get(TrackingStock, stock_id)
+    if not stock:
+        return redirect("/stock")
+    
+    today_date = date.today().isoformat()
+    return render_template("stock_detail.html", stock=stock, today_date=today_date)
 
 
 def ensure_user_active_mode_column():

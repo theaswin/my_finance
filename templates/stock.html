@@ -387,14 +387,7 @@
                 </div>
             </div>
             <div class="stock-actions">
-                <div class="mode-switcher" style="display: inline-flex; align-items: center; gap: 8px; margin-right: 10px;">
-                    <label style="font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">View Mode:</label>
-                    <select onchange="window.location.href='/switch_mode/' + this.value" style="padding: 8px 12px; font-size: 13px; font-weight: 600; border-radius: 8px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--text-main); cursor: pointer; outline: none; width: auto; transition: var(--transition);">
-                        {% for mode in all_modes %}
-                            <option value="{{ mode.id }}" {% if current_mode and current_mode.id == mode.id %}selected{% endif %}>{{ mode.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
+                <
                 <button class="btn btn-primary" onclick="openModal('add-stock-modal')">
                     <i data-lucide="plus"></i> Add Stock
                 </button>
@@ -415,28 +408,6 @@
                     <i data-lucide="eye" class="text-primary"></i>
                 </div>
             </div>
-            <div class="stock-stat-card">
-                <div class="stock-stat-info">
-                    <span class="stock-stat-label">Total Earnings</span>
-                    <span class="stock-stat-value text-success">
-                        ₹{{ "{:,.2f}".format(stocks | map(attribute='earnings') | select('number') | list | sum) }}
-                    </span>
-                </div>
-                <div class="stock-stat-icon bg-success-glow">
-                    <i data-lucide="trending-up" class="text-success"></i>
-                </div>
-            </div>
-            <div class="stock-stat-card">
-                <div class="stock-stat-info">
-                    <span class="stock-stat-label">Total Lost</span>
-                    <span class="stock-stat-value text-warning">
-                        ₹{{ "{:,.2f}".format(stocks | map(attribute='lost') | select('number') | list | sum) }}
-                    </span>
-                </div>
-                <div class="stock-stat-icon bg-warning-glow">
-                    <i data-lucide="trending-down" class="text-warning"></i>
-                </div>
-            </div>
         </div>
 
         <!-- Watchlist Stocks Section -->
@@ -453,7 +424,7 @@
             <div class="stock-grid">
                 {% if stocks %}
                     {% for stock in stocks %}
-                    <div class="stock-card" onclick="toggleCard(this, event)">
+                    <div class="stock-card" onclick="window.location.href='/stock_detail/{{ stock.id }}';" style="cursor: pointer;">
                         <div class="stock-card-header">
                             <!-- Logo top-left -->
                             <div class="stock-card-logo">
@@ -490,7 +461,7 @@
                         </div>
 
                         <!-- Price Lines details drawer (One2Many Lines) -->
-                        <div class="stock-details-drawer">
+                        <div class="stock-details-drawer" style="display: none;">
                             <div class="drawer-title">
                                 <span>Price Range Lines</span>
                                 <span class="badge">{{ stock.price_lines | length }} records</span>

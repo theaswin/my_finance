@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ stock.stock_name }} - Price Lines</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .detail-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 24px 32px;
+            gap: 20px;
+        }
+        .detail-header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .detail-logo {
+            width: 80px;
+            height: 80px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .detail-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .detail-logo i {
+            width: 40px;
+            height: 40px;
+            color: var(--primary);
+        }
+        .detail-info h1 {
+            font-size: 32px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            margin-bottom: 4px;
+        }
+        .detail-info p {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+        .detail-stats {
+            display: flex;
+            gap: 16px;
+        }
+        .detail-stat-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .detail-stat-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .detail-stat-value {
+            font-size: 20px;
+            font-weight: 800;
+        }
+        .detail-stat-value.earnings {
+            color: #22c55e;
+        }
+        .detail-stat-value.lost {
+            color: #ef4444;
+        }
+        
+        /* Back Button */
+        .back-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            text-decoration: none;
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .back-button:hover {
+            border-color: var(--border-hover);
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .back-button i {
+            width: 16px;
+            height: 16px;
+        }
+        
+        /* Price Lines Table */
+        .price-lines-section {
+            padding: 24px;
+        }
+        .price-lines-title-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .price-lines-title-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .price-lines-title-left h2 {
+            font-size: 18px;
+            font-weight: 700;
+        }
+        .price-lines-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .price-lines-table thead {
+            background: rgba(255, 255, 255, 0.04);
+            border-bottom: 1px solid var(--border-color);
+        }
+        .price-lines-table th {
+            padding: 16px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .price-lines-table tbody tr {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            transition: background 0.2s ease;
+        }
+        .price-lines-table tbody tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .price-lines-table td {
+            padding: 16px;
+            font-size: 14px;
+        }
+        .price-lines-table .low {
+            color: #ef4444;
+            font-weight: 600;
+        }
+        .price-lines-table .high {
+            color: #22c55e;
+            font-weight: 600;
+        }
+        .price-lines-table .date {
+            color: var(--text-muted);
+        }
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+        }
+        .btn-delete {
+            background: none;
+            border: none;
+            color: #ef4444;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn-delete:hover {
+            background: rgba(239, 68, 68, 0.1);
+        }
+        .btn-delete i {
+            width: 16px;
+            height: 16px;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+        .empty-state i {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 16px;
+            opacity: 0.4;
+        }
+        .empty-state h3 {
+            font-size: 18px;
+            margin-bottom: 8px;
+            color: var(--text-main);
+        }
+        
+        /* Add Price Line Form */
+        .add-line-form-section {
+            padding: 24px;
+            margin-top: 20px;
+        }
+        .form-title {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .inline-form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr auto;
+            gap: 12px;
+            align-items: flex-end;
+        }
+        .inline-form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .inline-form-group label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .inline-form-group input {
+            padding: 10px 12px;
+            font-size: 14px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            outline: none;
+            transition: var(--transition);
+        }
+        .inline-form-group input:focus {
+            border-color: var(--primary);
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .btn-inline-submit {
+            padding: 10px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 8px;
+            border: none;
+            background: var(--primary);
+            color: white;
+            cursor: pointer;
+            height: 42px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+        .btn-inline-submit:hover {
+            background: var(--primary-hover);
+        }
+        .btn-inline-submit i {
+            width: 18px;
+            height: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="glow-bg"></div>
+    <div class="app-container">
+        <!-- Header with Back Button -->
+        <header class="detail-header glass-card">
+            <div class="detail-header-left">
+                <div class="detail-logo">
+                    {% if stock.logo %}
+                        <img src="{{ stock.logo }}" alt="{{ stock.stock_name }}">
+                    {% else %}
+                        <i data-lucide="bar-chart-3"></i>
+                    {% endif %}
+                </div>
+                <div class="detail-info">
+                    <h1>{{ stock.stock_name }}</h1>
+                    <p>Price Range History</p>
+                    <div class="detail-stats">
+                        <div class="detail-stat-item">
+                            <span class="detail-stat-label">Earnings</span>
+                            <span class="detail-stat-value earnings">₹{{ "{:,.2f}".format(stock.earnings or 0) }}</span>
+                        </div>
+                        <div class="detail-stat-item">
+                            <span class="detail-stat-label">Lost</span>
+                            <span class="detail-stat-value lost">₹{{ "{:,.2f}".format(stock.lost or 0) }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <a href="/stock" class="back-button">
+                <i data-lucide="arrow-left"></i>
+                Back to Watchlist
+            </a>
+        </header>
+
+        <!-- Price Lines Section -->
+        <section class="glass-card price-lines-section">
+            <div class="price-lines-title-bar">
+                <div class="price-lines-title-left">
+                    <i data-lucide="list" style="width:20px; height:20px; color: var(--primary);"></i>
+                    <h2>Price Range Records</h2>
+                    <span class="badge">{{ stock.price_lines | length }} records</span>
+                </div>
+            </div>
+
+            {% if stock.price_lines %}
+                <table class="price-lines-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Low Price</th>
+                            <th>High Price</th>
+                            <th>Range</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for line in stock.price_lines | sort(attribute='date', reverse=True) %}
+                        <tr>
+                            <td class="date">{{ line.date.strftime('%b %d, %Y') if line.date else 'N/A' }}</td>
+                            <td class="low">₹{{ "{:,.2f}".format(line.low or 0) }}</td>
+                            <td class="high">₹{{ "{:,.2f}".format(line.high or 0) }}</td>
+                            <td>₹{{ "{:,.2f}".format((line.high or 0) - (line.low or 0)) }}</td>
+                            <td class="action-buttons">
+                                <a href="/delete_price_line/{{ line.id }}" class="btn-delete" onclick="return confirm('Delete this price range line?')" title="Delete">
+                                    <i data-lucide="trash-2"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="empty-state">
+                    <i data-lucide="bar-chart-3"></i>
+                    <h3>No Price Lines Yet</h3>
+                    <p>Add price range records to track the stock's historical price movements.</p>
+                </div>
+            {% endif %}
+        </section>
+
+        <!-- Add Price Line Form -->
+        <section class="glass-card add-line-form-section">
+            <div class="form-title">
+                <i data-lucide="plus-circle" style="width:18px; height:18px;"></i>
+                Add New Price Line
+            </div>
+            <form method="POST" action="/add_price_line/{{ stock.id }}">
+                <div class="inline-form-grid">
+                    <div class="inline-form-group">
+                        <label>Low Price (₹)</label>
+                        <input type="number" step="0.01" name="low" placeholder="Low price" required>
+                    </div>
+                    <div class="inline-form-group">
+                        <label>High Price (₹)</label>
+                        <input type="number" step="0.01" name="high" placeholder="High price" required>
+                    </div>
+                    <div class="inline-form-group">
+                        <label>Date</label>
+                        <input type="date" name="date" value="{{ today_date }}" required>
+                    </div>
+                    <button type="submit" class="btn-inline-submit" title="Add Price Line">
+                        <i data-lucide="plus"></i>
+                    </button>
+                </div>
+            </form>
+        </section>
+    </div>
+
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>
